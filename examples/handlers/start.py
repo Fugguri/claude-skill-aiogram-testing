@@ -14,7 +14,7 @@ class Onboarding(StatesGroup):
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer("Привет! Я фитнес-бот.")
+    await message.answer("Hello! I'm a fitness bot.")
 
 
 @router.message(Onboarding.waiting_age)
@@ -22,11 +22,11 @@ async def on_age(message: Message, state: FSMContext) -> None:
     age = int(message.text)
     await state.update_data(age=age)
     await state.set_state(Onboarding.waiting_height)
-    await message.answer("Сколько ты ростом?")
+    await message.answer("How tall are you?")
 
 
 @router.callback_query(lambda c: c.data == "confirm")
 async def on_confirm(callback: CallbackQuery) -> None:
     if callback.message:
-        await callback.message.edit_text("Подтверждено")
+        await callback.message.edit_text("Confirmed")
     await callback.answer()

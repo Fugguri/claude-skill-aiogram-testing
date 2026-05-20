@@ -9,4 +9,4 @@ async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_me
     sent = bot.get_request()
     assert isinstance(sent, SendMessage)
     assert sent.chat_id == 1
-    assert "Привет" in sent.text
+    assert "Hello" in sent.text

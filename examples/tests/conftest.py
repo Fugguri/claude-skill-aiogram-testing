@@ -18,9 +18,9 @@ def bot() -> MockedBot:
 def dp() -> Dispatcher:
     from handlers.start import router
 
-    # Router — module-level singleton. После первого include_router у него выставлен
-    # _parent_router, и второй вызов в следующем тесте падает с
-    # `Router is already attached to ...`. Сбрасываем перед attach.
+    # Router is a module-level singleton. After the first include_router its
+    # _parent_router is set; the next test would fail with
+    # `Router is already attached to ...`. Reset before attaching.
     router._parent_router = None  # type: ignore[attr-defined]
 
     d = Dispatcher(storage=MemoryStorage())

@@ -3,14 +3,14 @@
   "owner": {
     "name": "fugguri",
     "email": "fygguri@icloud.com",
-    "url": "https://github.com/fugguri"
+    "url": "https://github.com/Fugguri"
   },
   "plugins": [
     {
       "name": "testing-aiogram-bots",
       "source": "./skills/testing-aiogram-bots",
       "description": "Pytest testing skill for aiogram 3.x — MockedBot, Update dispatch, FSM assertions, no live bot, no network.",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "category": "testing",
       "tags": ["aiogram", "telegram", "pytest", "python", "testing", "fsm", "mockedbot"],
       "strict": false

@@ -219,7 +219,7 @@ Notice — thanks to `make_message_update` and `stub_message` fixtures (see conf
 | Read FSM state | `ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)` (sync) → `await ctx.get_state()` |
 | Set FSM state before a test | `await ctx.set_state(MyStates.waiting)` |
 | Read FSM data | `await ctx.get_data()` |
-| Feed a callback_query | `Update(update_id=1, callback_query=CallbackQuery(...))` |
+| Feed a callback_query | `await dp.feed_update(bot, make_callback_update("confirm"))` — see the `make_callback_update` fixture above |
 
 ## Queue ordering in MockedSession (important)
 
@@ -299,7 +299,8 @@ class AuthMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        data["user_role"] = "admin" if data["event_from_user"].id == 1 else "guest"
+        user = data.get("event_from_user")  # use .get — not every update carries a user
+        data["user_role"] = "admin" if user and user.id == 1 else "guest"
         return await handler(event, data)
 ```
 

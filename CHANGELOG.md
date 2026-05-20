@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] — 2026-05-20
+
+### Fixed
+- `examples/handlers/start.py`: replies were still in Russian (`"Привет!..."`, `"Сколько ты ростом?"`, `"Подтверждено"`) after the English-primary switch in 0.4.0. Translated to English so docs and runnable examples match.
+- `examples/tests/test_start.py`: assertion updated to `"Hello" in sent.text` to match the now-English handler.
+- `examples/tests/conftest.py`: Russian comment on the router-singleton workaround translated to English.
+- `SKILL.md` middleware example: `data["event_from_user"].id` → `data.get("event_from_user")` with `None`-guard. Original was KeyError-prone for updates without a user (poll, my_chat_member, etc.). The runnable `examples/middlewares/auth.py` already used the safe form; docs now match.
+- `SKILL.ru.md`: middleware example mirrored with the same safe `.get()` pattern.
+
+### Changed
+- `plugin.json` + `.claude-plugin/marketplace.json`: GitHub URL casing normalized to `Fugguri` (canonical).
+- `SKILL.md` + `SKILL.ru.md` Quick Reference: the `callback_query` row now points to the `make_callback_update` fixture instead of a raw `Update(...)` constructor.
+
 ## [0.4.0] — 2026-05-20
 
 ### Changed
@@ -60,6 +73,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.4.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.2.0

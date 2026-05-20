@@ -218,7 +218,7 @@ async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_me
 | Получить state в FSM | `ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)` (синхронно) → `await ctx.get_state()` |
 | Установить state до теста | `await ctx.set_state(MyStates.waiting)` |
 | Проверить data в FSM | `await ctx.get_data()` |
-| Прокачать callback_query | `Update(update_id=1, callback_query=CallbackQuery(...))` |
+| Прокачать callback_query | `await dp.feed_update(bot, make_callback_update("confirm"))` — см. фикстуру `make_callback_update` выше |
 
 ## Порядок очередей в MockedSession (важно)
 
@@ -298,7 +298,8 @@ class AuthMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        data["user_role"] = "admin" if data["event_from_user"].id == 1 else "guest"
+        user = data.get("event_from_user")  # не каждый апдейт несёт пользователя
+        data["user_role"] = "admin" if user and user.id == 1 else "guest"
         return await handler(event, data)
 ```
 

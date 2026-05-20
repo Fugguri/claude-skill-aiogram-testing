@@ -1,14 +1,14 @@
 {
   "name": "testing-aiogram-bots",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Skill for writing pytest tests for aiogram 3.x bot handlers without launching a live bot. Covers MockedBot setup, dispatching Update objects, asserting outgoing API calls, and FSM state checks.",
   "author": {
     "name": "fugguri",
     "email": "fygguri@icloud.com",
-    "url": "https://github.com/fugguri"
+    "url": "https://github.com/Fugguri"
   },
-  "homepage": "https://github.com/fugguri/claude-skill-aiogram-testing",
-  "repository": "https://github.com/fugguri/claude-skill-aiogram-testing",
+  "homepage": "https://github.com/Fugguri/claude-skill-aiogram-testing",
+  "repository": "https://github.com/Fugguri/claude-skill-aiogram-testing",
   "license": "MIT",
   "keywords": ["aiogram", "telegram", "pytest", "testing", "bot", "mockedbot", "fsm"]
 }
