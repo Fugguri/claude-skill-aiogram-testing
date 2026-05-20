@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-05-20
+
+### Changed
+- **`SKILL.md` is now English** (primary). The full Russian text moved to `SKILL.ru.md` (kept in sync).
+- README "Language note" updated to describe both files.
+
+### Added
+- Cross-link in `SKILL.ru.md` pointing back to the English `SKILL.md` as primary.
+
 ## [0.3.0] — 2026-05-20
 
 ### Added
@@ -51,6 +60,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.4.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.1.0

@@ -5,69 +5,71 @@ description: Use when writing pytest tests for aiogram 3.x bot handlers without 
 
 # Testing aiogram 3.x bots
 
+> Russian version: [SKILL.ru.md](./SKILL.ru.md)
+
 ## Overview
 
-Цель — тестировать хендлеры aiogram 3.x юнит/интеграционно, без живого бота и без сети. Подход стандартный для сообщества aiogram (2024-2026): настоящий `Dispatcher`, настоящий `Router`, **фейковая HTTP-сессия** через `MockedBot`. Так проверяются filters, middlewares, FSM — баги в роутинге ловятся.
+The goal: unit- and integration-test aiogram 3.x handlers without a live bot and without network. This is the community-standard approach for aiogram (2024-2026): real `Dispatcher`, real `Router`, **fake HTTP session** through `MockedBot`. This way filters, middlewares, and FSM are exercised — routing bugs get caught.
 
-## ⚠️ Критично: знать и не путать
+## ⚠️ Critical: know and don't confuse
 
-| Заблуждение | Правда |
+| Misconception | Truth |
 |------|--------|
-| `from aiogram.test_utils.mocked_bot import MockedBot` | **Не существует.** Модуля `aiogram.test_utils` в aiogram нет. |
-| Поставить `aiogram-tests` с PyPI | **Заброшен** (последний релиз окт 2022, под alpha aiogram 3). Не работает с aiogram 3.x stable. |
-| `pytest-aiogram` / `aiogram-pytest` на PyPI | **Пустые package squats** (0.1.0, без описания, без кода). |
-| `MockedBot` импортируется откуда-то готовым | **Нет.** Его нужно скопировать из репо `aiogram/aiogram` (`tests/mocked_bot.py`, ветка `dev-3.x`) к себе в `tests/mocked_bot.py`. |
+| `from aiogram.test_utils.mocked_bot import MockedBot` | **Doesn't exist.** There is no `aiogram.test_utils` module in aiogram. |
+| Install `aiogram-tests` from PyPI | **Abandoned** (last release Oct 2022, built against alpha aiogram 3). Does not work with aiogram 3.x stable. |
+| `pytest-aiogram` / `aiogram-pytest` on PyPI | **Empty package squats** (0.1.0, no description, no code). |
+| `MockedBot` is importable from somewhere ready-made | **No.** You need to copy it from the `aiogram/aiogram` repo (`tests/mocked_bot.py`, `dev-3.x` branch) into your own `tests/mocked_bot.py`. |
 
-**Rule of thumb:** если subagent уверенно пишет `from aiogram.test_utils...` — это галлюцинация. Стоп, проверь.
+**Rule of thumb:** if a subagent confidently writes `from aiogram.test_utils...` — it's a hallucination. Stop, verify.
 
-## Setup (один раз на проект)
+## Setup (once per project)
 
-### 1. Зависимости
+### 1. Dependencies
 ```bash
 # uv
 uv add --dev pytest pytest-asyncio
-# или pip
+# or pip
 pip install pytest pytest-asyncio
 ```
 
-### 2. Скопировать MockedBot
+### 2. Copy MockedBot
 
-Файл `tests/mocked_bot.py` уже есть в этом скилле — `mocked_bot.py` рядом с `SKILL.md`. Скопируй его в `tests/` твоего проекта:
+The `tests/mocked_bot.py` file already ships with this skill — `mocked_bot.py` lives next to `SKILL.md`. Copy it into your project's `tests/`:
 ```bash
 cp ~/.claude/skills/testing-aiogram-bots/mocked_bot.py tests/mocked_bot.py
 ```
 
-Альтернативно — скачать актуальную версию напрямую:
+Alternatively, fetch the current version directly:
 ```bash
 curl -o tests/mocked_bot.py https://raw.githubusercontent.com/aiogram/aiogram/dev-3.x/tests/mocked_bot.py
 ```
 
-### 3. pyproject.toml — конфиг pytest
+### 3. pyproject.toml — pytest config
 
-**Pytest 8+ (рекомендуемый, дефолтный `import_mode=importlib`):**
+**Pytest 8+ (recommended, default `import_mode=importlib`):**
 ```toml
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 ```
-Этого достаточно. `tests/__init__.py` не нужен, `pythonpath` не нужен — `importlib` mode сам разруливает.
+This is enough. `tests/__init__.py` is not required, `pythonpath` is not required — `importlib` mode handles it.
 
-**Pytest <8 ИЛИ `import_mode = "prepend"` (старый дефолт):**
+**Pytest <8 OR `import_mode = "prepend"` (the old default):**
 ```toml
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]   # чтобы `from tests.mocked_bot import MockedBot` резолвилось
+pythonpath = ["."]   # so `from tests.mocked_bot import MockedBot` resolves
 ```
-+ создать пустой `tests/__init__.py`:
+Plus create an empty `tests/__init__.py`:
 ```bash
 touch tests/__init__.py
 ```
-Без этого получишь `ModuleNotFoundError: No module named 'tests.mocked_bot'`.
+Without this you'll get `ModuleNotFoundError: No module named 'tests.mocked_bot'`.
 
-## Минимальный пример: тест /start
+## Minimal example: testing /start
 
-**Хендлер:**
+**Handler:**
 ```python
 # handlers/start.py
 from aiogram import Router
@@ -78,7 +80,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    await message.answer("Привет! Я фитнес-бот.")
+    await message.answer("Hello! I'm a fitness bot.")
 ```
 
 **conftest.py:**
@@ -104,8 +106,9 @@ def bot() -> MockedBot:
 def dp() -> Dispatcher:
     from handlers.start import router
 
-    # Router — module-level singleton. После первого include_router у него выставлен
-    # _parent_router; следующий тест упадёт с `Router is already attached to ...`.
+    # Router is a module-level singleton. After the first include_router its
+    # _parent_router is set; the next test will fail with
+    # `Router is already attached to ...`.
     router._parent_router = None  # type: ignore[attr-defined]
 
     d = Dispatcher(storage=MemoryStorage())
@@ -113,7 +116,7 @@ def dp() -> Dispatcher:
     return d
 
 
-# --- helpers: убирают бойлерплейт из тестов ---
+# --- helpers: remove boilerplate from tests ---
 
 def _user(user_id: int = 1) -> User:
     return User(id=user_id, is_bot=False, first_name="Test")
@@ -125,7 +128,7 @@ def _chat(chat_id: int = 1) -> Chat:
 
 @pytest.fixture
 def make_message_update():
-    """Фабрика Update с Message. `update = make_message_update("/start")`."""
+    """Update-with-Message factory. `update = make_message_update("/start")`."""
     ids = count(1)
 
     def _factory(text: str, *, user_id: int = 1, chat_id: int = 1) -> Update:
@@ -146,7 +149,7 @@ def make_message_update():
 
 @pytest.fixture
 def make_callback_update():
-    """Фабрика Update с CallbackQuery. `update = make_callback_update("confirm")`."""
+    """Update-with-CallbackQuery factory. `update = make_callback_update("confirm")`."""
     ids = count(1)
 
     def _factory(data: str, *, user_id: int = 1, chat_id: int = 1) -> Update:
@@ -172,7 +175,7 @@ def make_callback_update():
 
 @pytest.fixture
 def stub_message():
-    """Готовый Message для add_result_for(SendMessage, ...)."""
+    """Ready-made Message for add_result_for(SendMessage, ...)."""
     return Message(
         message_id=999,
         date=datetime.now(),
@@ -181,57 +184,57 @@ def stub_message():
     )
 ```
 
-**Тест:**
+**Test:**
 ```python
 # tests/test_start.py
 from aiogram.methods import SendMessage
 
 
 async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_message):
-    # ВАЖНО: MockedBot требует подготовить ответ Telegram заранее,
-    # иначе session.responses пуст и make_request упадёт IndexError.
+    # IMPORTANT: MockedBot requires you to queue the Telegram response in advance,
+    # otherwise session.responses is empty and make_request raises IndexError.
     bot.add_result_for(SendMessage, ok=True, result=stub_message)
 
     await dp.feed_update(bot, make_message_update("/start"))
 
-    sent = bot.get_request()  # последний вызванный метод API (LIFO)
+    sent = bot.get_request()  # last API method called (LIFO)
     assert isinstance(sent, SendMessage)
     assert sent.chat_id == 1
-    assert "Привет" in sent.text
+    assert "Hello" in sent.text
 ```
 
-Видишь — благодаря фикстурам `make_message_update` и `stub_message` (см. conftest выше) тест помещается в 5 строк вместо 30. Без фабрик каждый тест тонет в `Update/Message/Chat/User`-бойлерплейте.
+Notice — thanks to `make_message_update` and `stub_message` fixtures (see conftest above), the test fits in 5 lines instead of 30. Without factories, every test drowns in `Update/Message/Chat/User` boilerplate.
 
-**Запуск:** `pytest -v` (или `uv run pytest -v`).
+**Run:** `pytest -v` (or `uv run pytest -v`).
 
 ## Quick Reference
 
-| Что нужно | Как |
+| What you need | How |
 |-----------|-----|
-| Создать бот | `MockedBot()` (токен подставится `"42:TEST"`) |
-| Подготовить ответ Telegram | `bot.add_result_for(SendMessage, ok=True, result=Message(...))` — **до** `feed_update`, по одному на каждый исходящий вызов |
-| Прокачать апдейт через диспатчер | `await dp.feed_update(bot, Update(...))` |
-| Проверить последний вызов API | `bot.get_request()` — `.pop()` из deque (см. таблицу порядка ниже) |
-| Проверить все вызовы | `list(bot.session.requests)` — порядок вызовов |
-| Получить state в FSM | `ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)` (синхронно) → `await ctx.get_state()` |
-| Установить state до теста | `await ctx.set_state(MyStates.waiting)` |
-| Проверить data в FSM | `await ctx.get_data()` |
-| Прокачать callback_query | `Update(update_id=1, callback_query=CallbackQuery(...))` |
+| Create a bot | `MockedBot()` (token defaults to `"42:TEST"`) |
+| Queue a Telegram response | `bot.add_result_for(SendMessage, ok=True, result=Message(...))` — **before** `feed_update`, one per outgoing call |
+| Feed an update through the dispatcher | `await dp.feed_update(bot, Update(...))` |
+| Inspect the last API call | `bot.get_request()` — `.pop()` from a deque (see order table below) |
+| Inspect all calls | `list(bot.session.requests)` — call order |
+| Read FSM state | `ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)` (sync) → `await ctx.get_state()` |
+| Set FSM state before a test | `await ctx.set_state(MyStates.waiting)` |
+| Read FSM data | `await ctx.get_data()` |
+| Feed a callback_query | `Update(update_id=1, callback_query=CallbackQuery(...))` |
 
-## Порядок очередей в MockedSession (важно)
+## Queue ordering in MockedSession (important)
 
-`MockedSession` использует два `collections.deque` с `.append()` + `.pop()` справа. Это **LIFO**. Отсюда — два правила, которые путают чаще всего:
+`MockedSession` uses two `collections.deque` instances with `.append()` + `.pop()` from the right. That is **LIFO**. This produces two rules people get wrong most often:
 
-| Очередь | Доступ | Порядок | Как использовать |
+| Queue | Access | Order | How to use |
 |---------|--------|---------|------------------|
-| `session.responses` (ответы, которые ты готовишь) | `bot.add_result_for(...)` записывает справа, `make_request` читает через `.pop()` справа | **LIFO** | Если хендлер делает 2 вызова в порядке `A → B`, готовь ответы в обратном порядке: сначала `add_result_for(B, ...)`, затем `add_result_for(A, ...)`. Первым `pop()` достанется ответ A (соответствует первому вызову), вторым — ответ B. |
-| `session.requests` (исходящие вызовы, которые сделал хендлер) | `make_request` пишет справа через `.append()` | **FIFO via `list(bot.session.requests)`** (итерация deque = порядок вставки) — **LIFO via `bot.get_request()`** (`.pop()` справа) | Для проверки полной хронологии: `list(bot.session.requests)` — даёт `[первый, ..., последний]`. Для проверки конкретно последнего: `bot.get_request()`. |
+| `session.responses` (responses you queue up) | `bot.add_result_for(...)` writes on the right, `make_request` reads via `.pop()` on the right | **LIFO** | If the handler makes two calls in the order `A → B`, queue responses in reverse: first `add_result_for(B, ...)`, then `add_result_for(A, ...)`. The first `pop()` will hand back A's response (matching the first call), the second hands back B's. |
+| `session.requests` (outgoing calls the handler made) | `make_request` writes on the right via `.append()` | **FIFO via `list(bot.session.requests)`** (deque iteration follows insertion order) — **LIFO via `bot.get_request()`** (`.pop()` from the right) | To check the full chronology: `list(bot.session.requests)` gives `[first, ..., last]`. To check the most recent one only: `bot.get_request()`. |
 
-**Мнемоника:**
-- *responses* — добавляй задом наперёд («стек ответов»)
-- *requests* — читай через `list()` чтобы увидеть в порядке вызовов
+**Mnemonic:**
+- *responses* — queue in reverse order ("response stack")
+- *requests* — read via `list()` to see them in call order
 
-## FSM-тест — пример
+## FSM test — example
 
 ```python
 from aiogram.fsm.state import State, StatesGroup
@@ -240,7 +243,7 @@ from aiogram.methods import SendMessage
 
 class Onboarding(StatesGroup):
     waiting_age = State()
-    waiting_height = State()  # следующее состояние после ввода возраста
+    waiting_height = State()  # next state after the user enters their age
 
 
 async def test_age_input_advances_state(bot, dp, make_message_update, stub_message):
@@ -257,19 +260,19 @@ async def test_age_input_advances_state(bot, dp, make_message_update, stub_messa
     assert data["age"] == 25
 ```
 
-> Заметь: `Onboarding.waiting_height.state` (строка `"Onboarding:waiting_height"`), не сам объект `State`. `FSMContext.get_state()` возвращает строку.
+> Note: `Onboarding.waiting_height.state` (the string `"Onboarding:waiting_height"`), not the `State` object itself. `FSMContext.get_state()` returns a string.
 
-## Callback Query тест — пример
+## Callback Query test — example
 
 ```python
 from aiogram.methods import AnswerCallbackQuery, EditMessageText
 
 
 async def test_confirm_button_edits_message(bot, dp, make_callback_update):
-    # Хендлер выполняет: EditMessageText (1-й вызов), затем answer() (2-й вызов).
-    # responses — LIFO. Добавляем ответ на ПОСЛЕДНИЙ вызов первым, на первый — последним:
-    bot.add_result_for(AnswerCallbackQuery, ok=True, result=True)  # ответ на 2-й вызов
-    bot.add_result_for(EditMessageText, ok=True, result=True)      # ответ на 1-й вызов (на верху стека)
+    # Handler does: EditMessageText (1st call), then answer() (2nd call).
+    # responses is LIFO. Queue the response to the LAST call first, to the first call last:
+    bot.add_result_for(AnswerCallbackQuery, ok=True, result=True)  # response to 2nd call
+    bot.add_result_for(EditMessageText, ok=True, result=True)      # response to 1st call (top of stack)
 
     await dp.feed_update(bot, make_callback_update("confirm"))
 
@@ -278,9 +281,9 @@ async def test_confirm_button_edits_message(bot, dp, make_callback_update):
     assert any(isinstance(c, AnswerCallbackQuery) for c in all_calls)
 ```
 
-## Тест middleware
+## Middleware test
 
-Middleware регистрируется на `Dispatcher` или `Router` и срабатывает при `feed_update` — значит ловится тем же подходом. Проверяем: middleware **выполнилось** (например, положило что-то в `data`) и хендлер **получил** это значение.
+Middleware is registered on a `Dispatcher` or `Router` and fires during `feed_update` — meaning the same approach covers it. We verify: the middleware **ran** (e.g., dropped something into `data`) and the handler **received** that value.
 
 ```python
 # middlewares/auth.py
@@ -325,7 +328,7 @@ def dp_with_auth():
     d = Dispatcher(storage=MemoryStorage())
     d.message.middleware(AuthMiddleware())
     d.include_router(router)
-    d._captured = seen  # тестовый канал наружу
+    d._captured = seen  # channel for the test to read
     return d
 
 
@@ -341,31 +344,31 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
     assert dp_with_auth._captured["role"] == "guest"
 ```
 
-**Ключевое:** не вызывай middleware напрямую как функцию — теряешь интеграцию с диспатчером (порядок middlewares, outer vs inner, `event_from_user` inject). Прогоняй через `dp.feed_update`.
+**Key point:** don't call middleware directly as a function — you lose dispatcher integration (middleware order, outer vs inner, `event_from_user` injection). Drive it through `dp.feed_update`.
 
 ## Common Mistakes
 
-| Ошибка | Симптом | Фикс |
+| Mistake | Symptom | Fix |
 |--------|---------|------|
-| Не подготовил `add_result_for` | `IndexError: pop from an empty deque` | Готовь ответ ПЕРЕД каждым ожидаемым вызовом |
-| Хендлер шлёт 2 сообщения, ответ один | `IndexError` на втором вызове | `add_result_for` дважды |
-| Хендлер шлёт `SendMessage`, потом `AnswerCallbackQuery` — pydantic ругается «expected Message, got bool» | `session.responses` это LIFO-стек | Добавляй ответ на **последний** вызов первым, на **первый** — последним (см. секцию «Порядок очередей в MockedSession») |
-| `from aiogram.test_utils.*` | `ModuleNotFoundError` | Скопировать `mocked_bot.py` к себе, импорт `from tests.mocked_bot import MockedBot` |
-| `from_user=None` в Message | `TypeError` или фильтр не срабатывает | Всегда заполняй `from_user=User(...)` |
-| Вызов хендлера напрямую (`await cmd_start(message)`) | Тест проходит, а на проде баг | Используй `dp.feed_update` — иначе обходишь filters/middleware/FSM |
-| Нет `tests/__init__.py` (только в `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Либо создать пустой `__init__.py` + `pythonpath = ["."]`, либо использовать pytest 8+ дефолт `import_mode=importlib` (без `__init__.py`) |
-| `asyncio_mode` не настроен | `Async test functions are not natively supported` | `asyncio_mode = "auto"` в `pyproject.toml` или `@pytest.mark.asyncio` на каждый тест |
-| Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | В фикстуре `dp` перед `include_router` сбросить: `router._parent_router = None`. Альтернатива — создавать `Router()` внутри фикстуры (если архитектура позволяет), или использовать `importlib.reload(handlers.start)` (тяжёлый вариант) |
+| Forgot to call `add_result_for` | `IndexError: pop from an empty deque` | Queue the response BEFORE every expected outgoing call |
+| Handler sends 2 messages, only one response queued | `IndexError` on the second call | Call `add_result_for` twice |
+| Handler sends `SendMessage`, then `AnswerCallbackQuery` — pydantic complains "expected Message, got bool" | `session.responses` is a LIFO stack | Queue the response to the **last** call first, to the **first** call last (see "Queue ordering in MockedSession") |
+| `from aiogram.test_utils.*` | `ModuleNotFoundError` | Copy `mocked_bot.py` into your project, import as `from tests.mocked_bot import MockedBot` |
+| `from_user=None` in Message | `TypeError` or filter doesn't match | Always set `from_user=User(...)` |
+| Calling the handler directly (`await cmd_start(message)`) | Test passes, prod breaks | Use `dp.feed_update` — otherwise you bypass filters/middleware/FSM |
+| Missing `tests/__init__.py` (only in `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Either create an empty `__init__.py` + `pythonpath = ["."]`, or use the pytest 8+ default `import_mode=importlib` (no `__init__.py`) |
+| `asyncio_mode` not configured | `Async test functions are not natively supported` | `asyncio_mode = "auto"` in `pyproject.toml`, or `@pytest.mark.asyncio` on every test |
+| Second test fails with `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` is imported as a module-level singleton — after the first `include_router` its `_parent_router` is set | In the `dp` fixture, reset before `include_router`: `router._parent_router = None`. Alternatives: build `Router()` inside the fixture (if architecture allows), or `importlib.reload(handlers.start)` (heavy) |
 
-## Когда НЕ использовать этот подход
+## When NOT to use this approach
 
-- **Тестируешь сам Telegram API** (загрузка файлов, лимиты) — нужен реальный бот / Telegram Test Server.
-- **Чисто функциональная логика** (расчёт калорий, парсинг) — тестируй прямую функцию, без бота вообще.
-- **End-to-end сценарий через несколько ботов/чатов** — лучше aiogram + ботовый dev-токен на тестовом сервере.
+- **Testing the Telegram API itself** (file uploads, rate limits) — you need a real bot or the Telegram Test Server.
+- **Pure functional logic** (calorie computation, parsing) — test the function directly, no bot involved.
+- **End-to-end scenarios across several bots/chats** — use aiogram + a dev token on the test server.
 
-## Альтернатива (быстро, грубо)
+## Alternative (quick and dirty)
 
-`AsyncMock(spec=Bot)` + прямой вызов хендлера. Подходит, когда хендлер — простая функция и filters/middlewares не важны:
+`AsyncMock(spec=Bot)` plus a direct handler call. Fits when the handler is a simple function and filters/middlewares don't matter:
 
 ```python
 from datetime import datetime
@@ -391,24 +394,24 @@ async def test_handler_direct():
     bot.send_message.assert_called_once()
 ```
 
-**Минус:** не проходит через `Dispatcher` → не ловит баги фильтров, состояний, middleware. Не используй для критичных сценариев.
+**Downside:** doesn't go through `Dispatcher` → won't catch bugs in filters, states, or middleware. Don't use it for critical paths.
 
-## Источники и кредиты
+## Sources and credits
 
-Этот скил **упаковывает community-паттерн**, а не изобретает его. Кредиты:
+This skill **packages a community pattern**, it doesn't invent one. Credits:
 
-**aiogram framework и MockedBot:**
-- [aiogram/aiogram](https://github.com/aiogram/aiogram) — фреймворк (MIT)
-- [`tests/mocked_bot.py`](https://github.com/aiogram/aiogram/blob/dev-3.x/tests/mocked_bot.py) — эталонный `MockedBot`, vendored as-is
-- [`tests/dispatcher`](https://github.com/aiogram/aiogram/tree/dev-3.x/tests/dispatcher) — реальные примеры от команды
+**aiogram framework and MockedBot:**
+- [aiogram/aiogram](https://github.com/aiogram/aiogram) — the framework (MIT)
+- [`tests/mocked_bot.py`](https://github.com/aiogram/aiogram/blob/dev-3.x/tests/mocked_bot.py) — the reference `MockedBot`, vendored as-is
+- [`tests/dispatcher`](https://github.com/aiogram/aiogram/tree/dev-3.x/tests/dispatcher) — real examples from the team
 
-**Мейнтейнеры aiogram:**
-- [@JrooTJunior](https://github.com/JrooTJunior) (Alex Root Junior) — создатель и lead-мейнтейнер
-- [@Olegt0rr](https://github.com/Olegt0rr) — core-мейнтейнер, архитектура aiogram 3
-- [@MrMrRobat](https://github.com/MrMrRobat) — core-контрибьютор
+**aiogram maintainers:**
+- [@JrooTJunior](https://github.com/JrooTJunior) (Alex Root Junior) — creator and lead maintainer
+- [@Olegt0rr](https://github.com/Olegt0rr) — core maintainer, aiogram 3 architecture
+- [@MrMrRobat](https://github.com/MrMrRobat) — core contributor
 - [full list](https://github.com/aiogram/aiogram/graphs/contributors)
 
-**Обсуждение тестирования:**
-- [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread, открыт с 2020, официального API так и нет — отсюда необходимость vendoring
+**Testing discussion:**
+- [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread, open since 2020. No official API has landed — hence the need to vendor.
 
-**Упаковка в скил:** [@fugguri](https://github.com/Fugguri)
+**Skill packaging:** [@fugguri](https://github.com/Fugguri)
