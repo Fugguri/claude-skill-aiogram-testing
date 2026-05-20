@@ -1,6 +1,6 @@
 {
   "name": "testing-aiogram-bots",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Skill for writing pytest tests for aiogram 3.x bot handlers without launching a live bot. Covers MockedBot setup, dispatching Update objects, asserting outgoing API calls, and FSM state checks.",
   "author": {
     "name": "fugguri",

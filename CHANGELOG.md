@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-05-20
+
+### Added
+- **"Where tests live" section** at the top of both `SKILL.md` and `SKILL.ru.md`. Hard rule: all test files (incl. `conftest.py`, `mocked_bot.py`) MUST be placed under `tests/`, never at project root. Includes the required directory layout diagram.
+- Common Mistakes table now has a row for "Test files written to project root" with the symptom (`pytest collected 0 items`) and the fix.
+- `scripts/check_doc_sync.py` gained an 11th pair: presence of the tests/-directory directive in `SKILL.md` is now linted.
+
+### Changed
+- Frontmatter `description` (both files) now explicitly says: "All test files MUST be created under tests/ (never at project root)." This helps the AI route requests like "write a test" to the correct directory from the first turn.
+
+### Why
+- Coding agents (including Claude Code in less-careful modes) default to writing `test_*.py` next to whatever file they were editing, which often ends up at the project root. `pytest` with `testpaths = ["tests"]` then silently collects zero tests, and the user thinks the agent did the work. The directive + linted check eliminate that failure mode.
+
 ## [0.5.0] — 2026-05-20
 
 ### Added
@@ -107,6 +120,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.5.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.0
 [0.4.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.1

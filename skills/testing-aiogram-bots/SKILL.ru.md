@@ -1,6 +1,6 @@
 ---
 name: testing-aiogram-bots
-description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot — covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
+description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot. All test files MUST be created under tests/ (never at project root). Covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
 ---
 
 # Testing aiogram 3.x bots
@@ -21,6 +21,33 @@ description: Use when writing pytest tests for aiogram 3.x bot handlers without 
 | `MockedBot` импортируется откуда-то готовым | **Нет.** Его нужно скопировать из репо `aiogram/aiogram` (`tests/mocked_bot.py`, ветка `dev-3.x`) к себе в `tests/mocked_bot.py`. |
 
 **Rule of thumb:** если subagent уверенно пишет `from aiogram.test_utils...` — это галлюцинация. Стоп, проверь.
+
+## Где живут тесты (прочитай первым)
+
+**Все тестовые файлы — внутри `tests/` в корне проекта.** Никогда не пиши `test_*.py`, `conftest.py` или `mocked_bot.py` в корень проекта — даже для "быстрого" одного теста. Причины:
+
+- `pytest` discovery в этом скиле настроен на `testpaths = ["tests"]`. Тест, положенный в корень, будет молча пропущен.
+- `from tests.mocked_bot import MockedBot` резолвится только если `mocked_bot.py` лежит внутри `tests/`.
+- Смешивание исходников и тестов в корне ломает упаковку (`pip install .`, `uv build`) — тестовые фикстуры утекут в wheel.
+
+**Обязательная раскладка для любого нового теста:**
+```
+project_root/
+├── handlers/
+│   └── start.py
+├── middlewares/
+│   └── auth.py
+├── tests/                    ← каждый тест-файл — сюда
+│   ├── __init__.py           ← только если используется import_mode=prepend
+│   ├── conftest.py           ← фикстуры (bot, dp, make_message_update, ...)
+│   ├── mocked_bot.py         ← vendored из этого скила
+│   ├── test_start.py
+│   ├── test_fsm.py
+│   └── test_callbacks.py
+└── pyproject.toml
+```
+
+Если папки `tests/` ещё нет — создай её перед первым тестом. Если `conftest.py` уже существует в корне по какой-то другой причине, **не** двигай его — допиши фикстуры в `tests/conftest.py`.
 
 ## Setup (один раз на проект)
 
@@ -360,6 +387,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Вызов хендлера напрямую (`await cmd_start(message)`) | Тест проходит, а на проде баг | Используй `dp.feed_update` — иначе обходишь filters/middleware/FSM |
 | Нет `tests/__init__.py` (только в `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Либо создать пустой `__init__.py` + `pythonpath = ["."]`, либо использовать pytest 8+ дефолт `import_mode=importlib` (без `__init__.py`) |
 | `asyncio_mode` не настроен | `Async test functions are not natively supported` | `asyncio_mode = "auto"` в `pyproject.toml` или `@pytest.mark.asyncio` на каждый тест |
+| Тесты написаны в корень проекта (`test_start.py` рядом с `main.py`) | `pytest` пишет `collected 0 items`; или import-ошибки потому что `from tests.mocked_bot import ...` не резолвится | Все тесты ОБЯЗАНЫ лежать в `tests/`. См. "Где живут тесты" в начале. Переноси файл в `tests/`, не наоборот. |
 | Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | **Предпочтительно:** строить свежий `Router()` внутри фикстуры и регистрировать хендлеры через factory (`def make_router(): ...` в модуле хендлеров). **Быстрый обход** (если рефакторинг сейчас не вариант): `router._parent_router = None` перед `include_router`. **Крайний случай:** `importlib.reload(handlers.start)` (тяжело, ломает identity-сравнения). |
 
 ## Когда НЕ использовать этот подход

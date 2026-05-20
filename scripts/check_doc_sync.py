@@ -54,6 +54,11 @@ PAIRS = [
     ("MockedBot import",
      "from tests.mocked_bot import MockedBot",
      [EXAMPLES / "tests" / "conftest.py"]),
+    ("explicit tests/ directory directive",
+     "All test files",  # documented in 'Where tests live' section
+     # No example file to check — this is a doc-only directive.
+     # We still verify it survives in SKILL.md.
+     []),
 ]
 
 

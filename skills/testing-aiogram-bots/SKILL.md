@@ -1,6 +1,6 @@
 ---
 name: testing-aiogram-bots
-description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot — covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
+description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot. All test files MUST be created under tests/ (never at project root). Covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
 ---
 
 # Testing aiogram 3.x bots
@@ -21,6 +21,33 @@ The goal: unit- and integration-test aiogram 3.x handlers without a live bot and
 | `MockedBot` is importable from somewhere ready-made | **No.** You need to copy it from the `aiogram/aiogram` repo (`tests/mocked_bot.py`, `dev-3.x` branch) into your own `tests/mocked_bot.py`. |
 
 **Rule of thumb:** if a subagent confidently writes `from aiogram.test_utils...` — it's a hallucination. Stop, verify.
+
+## Where tests live (read this first)
+
+**All test files go under `tests/` at the project root.** Never write `test_*.py`, `conftest.py`, or `mocked_bot.py` to the project root — even for a "quick" single test. Reasons:
+
+- `pytest` discovery in this skill assumes `testpaths = ["tests"]`. A test placed at the project root will be silently skipped.
+- `from tests.mocked_bot import MockedBot` only resolves if `mocked_bot.py` is inside `tests/`.
+- Mixing source code and test files in the root makes packaging (`pip install .`, `uv build`) ship test fixtures into the wheel.
+
+**Required layout for any new test:**
+```
+project_root/
+├── handlers/
+│   └── start.py
+├── middlewares/
+│   └── auth.py
+├── tests/                    ← every test file lives here
+│   ├── __init__.py           ← only when using import_mode=prepend
+│   ├── conftest.py           ← fixtures (bot, dp, make_message_update, ...)
+│   ├── mocked_bot.py         ← vendored from this skill
+│   ├── test_start.py
+│   ├── test_fsm.py
+│   └── test_callbacks.py
+└── pyproject.toml
+```
+
+If the `tests/` directory does not exist yet, create it before writing the first test. If `conftest.py` already exists at the root for some other reason, do **not** move it — append your fixtures to `tests/conftest.py` instead.
 
 ## Setup (once per project)
 
@@ -361,6 +388,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Calling the handler directly (`await cmd_start(message)`) | Test passes, prod breaks | Use `dp.feed_update` — otherwise you bypass filters/middleware/FSM |
 | Missing `tests/__init__.py` (only in `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Either create an empty `__init__.py` + `pythonpath = ["."]`, or use the pytest 8+ default `import_mode=importlib` (no `__init__.py`) |
 | `asyncio_mode` not configured | `Async test functions are not natively supported` | `asyncio_mode = "auto"` in `pyproject.toml`, or `@pytest.mark.asyncio` on every test |
+| Test files written to project root (`test_start.py` next to `main.py`) | `pytest` reports `collected 0 items`; or import errors because `from tests.mocked_bot import ...` does not resolve | All test files MUST live under `tests/`. See "Where tests live" at the top. Move the file to `tests/`, never the other way around. |
 | Second test fails with `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` is imported as a module-level singleton — after the first `include_router` its `_parent_router` is set | **Preferred:** build a fresh `Router()` inside the fixture and re-register handlers via a factory (`def make_router(): ...` in your handlers module). **Quick workaround if refactoring is out of scope:** `router._parent_router = None` before `include_router`. **Last resort:** `importlib.reload(handlers.start)` (heavy, breaks identity comparisons). |
 
 ## When NOT to use this approach
