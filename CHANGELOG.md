@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-05-20
+
+### Added
+- **aiogram matrix in CI** — `pytest examples/` now runs on the cross product of Python `[3.10, 3.11, 3.12]` × aiogram `[3.13, 3.20, 3.28.2]`. Total: 9 environments. Locally verified all 9 green before pushing.
+- **`scripts/check_doc_sync.py`** — lint that pins 10 critical snippets (handler reply strings, fixture names, FSM assertions, middleware safety pattern) between `SKILL.md` and `examples/`. CI fails if either side drifts. This guards against the v0.4.0 → v0.4.1 regression (Russian handler vs English docs) reoccurring.
+- New CI job `doc-example-sync` runs the lint above on every push.
+
+### Changed
+- CI job `claude plugin validate` no longer uses `continue-on-error: true`. The Node.js setup step is now explicit so `npm install -g @anthropic-ai/claude-code` is reliable. A failed validation now actually fails the build.
+
+### Verified
+- Manual install loop reproduced end-to-end:
+  - `claude plugin marketplace add Fugguri/claude-skill-aiogram-testing` → marketplace registered as `fugguri-aiogram-testing`
+  - `claude plugin install testing-aiogram-bots@fugguri-aiogram-testing` → installed at scope `user`, version `0.5.0` read from manifest
+  - `claude plugin list` lists the skill correctly
+- All 9 aiogram × Python combos pass locally.
+- `claude plugin validate --strict` passes locally.
+- `scripts/check_doc_sync.py` reports 10/10 pairs in sync.
+
 ## [0.4.2] — 2026-05-20
 
 ### Fixed (blocker)
@@ -88,6 +107,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.5.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.0
 [0.4.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.0
