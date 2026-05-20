@@ -8,6 +8,23 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 _Nothing yet — pending changes land here._
 
+## [0.6.1] — 2026-05-20
+
+### Fixed (blocker)
+- `InlineQuery` was missing from the `from aiogram.types import ...` line in the `conftest.py` block of both `SKILL.md` and `SKILL.ru.md`. A user copy-pasting that block as documented would hit `NameError: name 'InlineQuery' is not defined`. The fixture body referenced `InlineQuery`, and a follow-up note told the reader to "add `InlineQuery` to the import" — hostile UX in a skill whose selling point is paste-and-run fixtures. Import line now includes `InlineQuery`; the dangling note is gone.
+
+### Added
+- `examples/tests/test_factories.py` — smoke tests for the factory fixtures themselves. If aiogram tightens validation on `Update`/`Message`/`CallbackQuery`/`InlineQuery` in a future release, these fail with a clear pydantic message instead of every downstream test failing for an obscure reason.
+
+### Changed
+- `README.md` "Demo" section: replaced the aspirational AI-imagined transcript with a verified-against-Claude-Code installation log. The previous version included lines like `[skill: testing-aiogram-bots activated]` and a green-check file list that Claude Code does not actually emit. Now ships real terminal output and a calibrated "expected behavior" disclaimer ("not a guarantee, since model output is not deterministic").
+- `.github/workflows/ci.yml` `claude plugin validate` job: `npm install -g @anthropic-ai/claude-code` now retries up to 3 times with 10s backoff. npm registry flakes used to fail an otherwise-fine CI run.
+
+### Verified
+- `python scripts/check_doc_sync.py` → 12 full triples + 4 examples-only snippets (16 total).
+- `pytest examples/` → **12/12** locally (was 7/7 in 0.6.0).
+- `claude plugin validate --strict` → passed.
+
 ## [0.6.0] — 2026-05-20
 
 ### Added
@@ -167,6 +184,7 @@ _Nothing yet — pending changes land here._
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.6.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.6.0
 [0.5.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.1

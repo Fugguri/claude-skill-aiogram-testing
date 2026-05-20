@@ -75,8 +75,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
+      - name: Install Claude Code CLI (retry on npm flake)
+        run: |
+          for i in 1 2 3; do
+            npm install -g @anthropic-ai/claude-code && break
+            echo "::warning::npm install attempt $i failed, retrying after 10s..."
+            sleep 10
+          done
       - name: Validate plugin manifest (strict)
         run: claude plugin validate skills/testing-aiogram-bots --strict
 

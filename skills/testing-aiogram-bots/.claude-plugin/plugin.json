@@ -1,6 +1,6 @@
 {
   "name": "testing-aiogram-bots",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Pytest testing skill for aiogram 3.x bots. MockedBot + Dispatcher pattern, no live bot, no network. Covers Message/CallbackQuery/InlineQuery dispatch, FSM transitions, middleware, error handlers. Includes guardrails against common AI hallucinations about aiogram testing.",
   "author": {
     "name": "fugguri",

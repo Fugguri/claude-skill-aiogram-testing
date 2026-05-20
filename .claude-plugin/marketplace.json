@@ -10,7 +10,7 @@
       "name": "testing-aiogram-bots",
       "source": "./skills/testing-aiogram-bots",
       "description": "Pytest testing skill for aiogram 3.x — MockedBot, Message/CallbackQuery/InlineQuery dispatch, FSM, middleware, error handlers. No live bot, no network. AI-hallucination guardrails included.",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "category": "testing",
       "tags": ["aiogram", "telegram", "pytest", "python", "testing", "fsm", "mockedbot"]
     }

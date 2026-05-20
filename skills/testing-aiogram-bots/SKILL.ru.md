@@ -119,7 +119,7 @@ from itertools import count
 import pytest
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import CallbackQuery, Chat, Message, Update, User
+from aiogram.types import CallbackQuery, Chat, InlineQuery, Message, Update, User
 
 from tests.mocked_bot import MockedBot
 
@@ -230,8 +230,6 @@ def stub_message():
     )
 ```
 
-> Добавь `InlineQuery` к импорту из `aiogram.types`.
->
 > **Расширение фабрик.** Для типов апдейтов, которых здесь нет — `my_chat_member`, `poll`, `chat_join_request` и т.д. — повтори паттерн: бери имя поля из [модели `Update`](https://docs.aiogram.dev/en/latest/api/types/update.html), конструируй соответствующий тип с минимальными валидными полями, оборачивай в `Update(update_id=..., <field>=...)`, возвращай.
 
 **Тест:**

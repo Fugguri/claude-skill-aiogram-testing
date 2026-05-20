@@ -44,39 +44,28 @@ cp -r claude-skill-aiogram-testing/skills/testing-aiogram-bots ~/.claude/skills/
 
 When working on an aiogram project, ask Claude to "write tests for this handler" or "add pytest coverage for the FSM flow" — the skill auto-activates and follows the included workflow.
 
-## Demo (what installation + a test loop looks like)
+## Installation flow
+
+Verified `claude plugin marketplace add` + `claude plugin install` output (recorded against Claude Code locally):
 
 ```text
 $ claude plugin marketplace add Fugguri/claude-skill-aiogram-testing
-Adding marketplace…
-Cloning via SSH: git@github.com:Fugguri/claude-skill-aiogram-testing.git
-✔ Successfully added marketplace: fugguri-aiogram-testing
+Adding marketplace…Cloning via SSH: git@github.com:Fugguri/claude-skill-aiogram-testing.git
+Refreshing marketplace cache (timeout: 120s)…
+Clone complete, validating marketplace…
+✔ Successfully added marketplace: fugguri-aiogram-testing (declared in user settings)
 
 $ claude plugin install testing-aiogram-bots@fugguri-aiogram-testing
-✔ Successfully installed plugin: testing-aiogram-bots@fugguri-aiogram-testing
+Installing plugin "testing-aiogram-bots@fugguri-aiogram-testing"...
+✔ Successfully installed plugin: testing-aiogram-bots@fugguri-aiogram-testing (scope: user)
 
-$ claude
-> write me a pytest test for the /start handler in handlers/start.py
-
-  [skill: testing-aiogram-bots activated]
-  Following the documented layout — creating tests/conftest.py with the
-  MockedBot + factory fixtures, then tests/test_start.py.
-
-  ✓ tests/mocked_bot.py        (vendored from this skill)
-  ✓ tests/__init__.py
-  ✓ tests/conftest.py          (bot, dp, make_message_update, stub_message)
-  ✓ tests/test_start.py        (asserts SendMessage call, chat_id, reply text)
-
-  Running pytest -v tests/test_start.py …
-  tests/test_start.py::test_start_replies_with_greeting PASSED
-  1 passed in 0.21s
+$ claude plugin list | grep -A2 aiogram
+  ❯ testing-aiogram-bots@fugguri-aiogram-testing
+    Version: 0.6.0
+    Scope: user
 ```
 
-The skill instructs the model to (a) always place tests under `tests/`,
-(b) copy `mocked_bot.py` from the plugin into the project, (c) use the
-factory fixtures instead of building `Update`/`Message`/`Chat`/`User`
-objects manually, and (d) flag the typical hallucinations (`aiogram.test_utils`,
-`aiogram-tests`) before they reach the code.
+Once installed, the skill auto-activates when you ask Claude to write or extend pytest tests in an aiogram project. The expected behavior (not a guarantee, since model output is not deterministic): tests get created **under `tests/`** rather than at the project root, the documented factory fixtures are used instead of hand-built `Update`/`Message`/`Chat`/`User` objects, and the common AI hallucinations about aiogram testing (`aiogram.test_utils`, `aiogram-tests`) are flagged before they reach the code.
 
 ## Languages
 
