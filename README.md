@@ -53,10 +53,14 @@ Both files are equivalent in content. Pick whichever you prefer; the AI consumes
 
 ## Contents
 
-- `skills/testing-aiogram-bots/SKILL.md` — the skill instructions (TDD workflow, setup, examples)
-- `skills/testing-aiogram-bots/mocked_bot.py` — vendored `MockedBot` from `aiogram/aiogram` `dev-3.x`
-- `skills/testing-aiogram-bots/plugin.json` — plugin manifest
+- `skills/testing-aiogram-bots/SKILL.md` — the skill instructions (English, primary)
+- `skills/testing-aiogram-bots/SKILL.ru.md` — Russian mirror, kept in sync via `scripts/check_doc_sync.py`
+- `skills/testing-aiogram-bots/mocked_bot.py` — vendored `MockedBot` from `aiogram/aiogram` `dev-3.x`, pinned to a specific SHA (CI verifies it stays in sync)
+- `skills/testing-aiogram-bots/AIOGRAM-LICENSE` — MIT license of upstream aiogram, shipped next to the vendored file
+- `skills/testing-aiogram-bots/.claude-plugin/plugin.json` — plugin manifest (per [Claude Code plugin spec](https://code.claude.com/docs/en/plugins-reference))
 - `.claude-plugin/marketplace.json` — marketplace registration
+- `examples/` — runnable copy of the SKILL.md examples, exercised by CI on Python 3.10/3.11/3.12 × aiogram 3.13/3.20/3.28
+- `scripts/check_doc_sync.py` — lint that pins critical snippets between `SKILL.md`, `SKILL.ru.md`, and `examples/`
 
 ## Credits
 

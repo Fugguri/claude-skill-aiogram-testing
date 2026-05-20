@@ -20,6 +20,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SKILL_MD = REPO / "skills" / "testing-aiogram-bots" / "SKILL.md"
+SKILL_RU = REPO / "skills" / "testing-aiogram-bots" / "SKILL.ru.md"
 EXAMPLES = REPO / "examples"
 
 # (label, snippet_that_must_appear_in_BOTH_files, [paths_to_search_for_examples])
@@ -64,12 +65,16 @@ PAIRS = [
 
 def main() -> int:
     skill_md = SKILL_MD.read_text(encoding="utf-8")
+    skill_ru = SKILL_RU.read_text(encoding="utf-8")
     errors: list[str] = []
 
+    # Code snippets are identical English in both SKILL.md and SKILL.ru.md;
+    # only the prose differs. So every PAIR snippet must appear in both files.
     for label, snippet, example_paths in PAIRS:
         if snippet not in skill_md:
             errors.append(f"[{label}] SKILL.md is missing the documented snippet:\n  {snippet!r}")
-            continue
+        if snippet not in skill_ru:
+            errors.append(f"[{label}] SKILL.ru.md is missing the documented snippet:\n  {snippet!r}")
         for path in example_paths:
             if not path.exists():
                 errors.append(f"[{label}] expected example file does not exist: {path}")
@@ -77,20 +82,20 @@ def main() -> int:
             if snippet not in path.read_text(encoding="utf-8"):
                 rel = path.relative_to(REPO)
                 errors.append(
-                    f"[{label}] {rel} is missing a snippet that SKILL.md documents:\n  {snippet!r}"
+                    f"[{label}] {rel} is missing a snippet that the docs reference:\n  {snippet!r}"
                 )
 
     if errors:
-        print("::error::SKILL.md ↔ examples/ drift detected:\n")
+        print("::error::SKILL.md ↔ SKILL.ru.md ↔ examples/ drift detected:\n")
         for e in errors:
             print(" -", e)
         print(
-            "\nFix: update either SKILL.md or the example file so they match,"
+            "\nFix: update SKILL.md, SKILL.ru.md, and the example file together,"
             " then update this script if the documented behavior intentionally changed."
         )
         return 1
 
-    print(f"OK: {len(PAIRS)} doc/example pairs in sync.")
+    print(f"OK: {len(PAIRS)} doc/example triples in sync (EN + RU + examples).")
     return 0
 
 

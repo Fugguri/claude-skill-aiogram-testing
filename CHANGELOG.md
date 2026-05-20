@@ -4,6 +4,26 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+_Nothing yet — pending changes land here._
+
+## [0.5.2] — 2026-05-20
+
+### Fixed
+- `README.md` Contents section listed `plugin.json` at the legacy path (without `.claude-plugin/`). Updated to the correct, currently-shipped layout and expanded with the rest of the repo structure (RU mirror, AIOGRAM-LICENSE, scripts, examples, manifest).
+- `CONTRIBUTING.md` had three stale claims after the English-primary switch in 0.4.0:
+  - asked for an "English translation as `SKILL.en.md`" (English is already primary; the Russian mirror is `SKILL.ru.md`)
+  - said `SKILL.md` examples have Russian comments (they don't anymore — that was the 0.4.1 regression, fixed)
+  - never mentioned `scripts/check_doc_sync.py` or the RU sync requirement
+  All three corrected.
+- `examples/handlers/start.py` used `lambda c: c.data == "confirm"` in the callback filter. Swapped to idiomatic aiogram 3.x magic filter `F.data == "confirm"`. A skill that teaches "modern aiogram" should not headline a lambda where the framework has a first-class operator.
+
+### Added
+- `scripts/check_doc_sync.py` now also validates that every pinned snippet appears in `SKILL.ru.md`, not only `SKILL.md` + `examples/`. Caught real drift in this release: the Russian mirror still had `"Привет! Я фитнес-бот."` in its code block while the English primary used `"Hello! I'm a fitness bot."`. Both files now share identical English code blocks per the documented convention.
+- `When NOT to use this approach` section now flags `MockedSession.stream_content -> b""` — file downloads will silently get zero bytes; stub the download method or use a real session for those tests.
+- `CHANGELOG.md` now has an `## [Unreleased]` section, matching the contributor instructions.
+
 ## [0.5.1] — 2026-05-20
 
 ### Added
@@ -120,6 +140,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.5.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.0
 [0.4.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.2

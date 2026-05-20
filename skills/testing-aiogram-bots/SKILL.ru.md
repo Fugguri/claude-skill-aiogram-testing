@@ -107,7 +107,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    await message.answer("Привет! Я фитнес-бот.")
+    await message.answer("Hello! I'm a fitness bot.")
 ```
 
 **conftest.py:**
@@ -226,7 +226,7 @@ async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_me
     sent = bot.get_request()  # последний вызванный метод API (LIFO)
     assert isinstance(sent, SendMessage)
     assert sent.chat_id == 1
-    assert "Привет" in sent.text
+    assert "Hello" in sent.text
 ```
 
 Видишь — благодаря фикстурам `make_message_update` и `stub_message` (см. conftest выше) тест помещается в 5 строк вместо 30. Без фабрик каждый тест тонет в `Update/Message/Chat/User`-бойлерплейте.
@@ -395,6 +395,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 - **Тестируешь сам Telegram API** (загрузка файлов, лимиты) — нужен реальный бот / Telegram Test Server.
 - **Чисто функциональная логика** (расчёт калорий, парсинг) — тестируй прямую функцию, без бота вообще.
 - **End-to-end сценарий через несколько ботов/чатов** — лучше aiogram + ботовый dev-токен на тестовом сервере.
+- **Скачивание файлов через `Bot.download_file` и подобное.** `MockedSession.stream_content` возвращает пустые байты (`b""`); любой тест, проходящий через download-путь, тихо получит zero-byte файл. Замокай метод напрямую через `unittest.mock` или используй реальную сессию для конкретно этого теста.
 
 ## Альтернатива (быстро, грубо)
 

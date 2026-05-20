@@ -396,6 +396,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 - **Testing the Telegram API itself** (file uploads, rate limits) — you need a real bot or the Telegram Test Server.
 - **Pure functional logic** (calorie computation, parsing) — test the function directly, no bot involved.
 - **End-to-end scenarios across several bots/chats** — use aiogram + a dev token on the test server.
+- **File downloads via `Bot.download_file` or similar.** `MockedSession.stream_content` returns empty bytes (`b""`); any test that exercises a download path will silently get a zero-byte file. Stub the download method directly with `unittest.mock` or use a real session for that one test.
 
 ## Alternative (quick and dirty)
 

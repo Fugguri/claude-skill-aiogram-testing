@@ -1,4 +1,4 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -25,7 +25,7 @@ async def on_age(message: Message, state: FSMContext) -> None:
     await message.answer("How tall are you?")
 
 
-@router.callback_query(lambda c: c.data == "confirm")
+@router.callback_query(F.data == "confirm")
 async def on_confirm(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text("Confirmed")
