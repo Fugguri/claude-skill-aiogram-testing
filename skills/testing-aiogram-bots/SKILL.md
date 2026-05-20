@@ -260,7 +260,9 @@ async def test_age_input_advances_state(bot, dp, make_message_update, stub_messa
     assert data["age"] == 25
 ```
 
-> Note: `Onboarding.waiting_height.state` (the string `"Onboarding:waiting_height"`), not the `State` object itself. `FSMContext.get_state()` returns a string.
+> Notes:
+> 1. `Onboarding.waiting_height.state` (the string `"Onboarding:waiting_height"`), not the `State` object itself. `FSMContext.get_state()` returns a string.
+> 2. In real code put `Onboarding` next to the handlers (e.g., `handlers/start.py`) and `from handlers.start import Onboarding` in the test. Declaring `StatesGroup` inside a test file means the test and the handler would reference two **different** `State` objects and the assertion fails silently.
 
 ## Callback Query test — example
 
@@ -359,7 +361,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Calling the handler directly (`await cmd_start(message)`) | Test passes, prod breaks | Use `dp.feed_update` — otherwise you bypass filters/middleware/FSM |
 | Missing `tests/__init__.py` (only in `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Either create an empty `__init__.py` + `pythonpath = ["."]`, or use the pytest 8+ default `import_mode=importlib` (no `__init__.py`) |
 | `asyncio_mode` not configured | `Async test functions are not natively supported` | `asyncio_mode = "auto"` in `pyproject.toml`, or `@pytest.mark.asyncio` on every test |
-| Second test fails with `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` is imported as a module-level singleton — after the first `include_router` its `_parent_router` is set | In the `dp` fixture, reset before `include_router`: `router._parent_router = None`. Alternatives: build `Router()` inside the fixture (if architecture allows), or `importlib.reload(handlers.start)` (heavy) |
+| Second test fails with `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` is imported as a module-level singleton — after the first `include_router` its `_parent_router` is set | **Preferred:** build a fresh `Router()` inside the fixture and re-register handlers via a factory (`def make_router(): ...` in your handlers module). **Quick workaround if refactoring is out of scope:** `router._parent_router = None` before `include_router`. **Last resort:** `importlib.reload(handlers.start)` (heavy, breaks identity comparisons). |
 
 ## When NOT to use this approach
 
@@ -415,4 +417,4 @@ This skill **packages a community pattern**, it doesn't invent one. Credits:
 **Testing discussion:**
 - [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread, open since 2020. No official API has landed — hence the need to vendor.
 
-**Skill packaging:** [@fugguri](https://github.com/Fugguri)
+**Skill packaging:** [@Fugguri](https://github.com/Fugguri)

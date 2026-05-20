@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] — 2026-05-20
+
+### Fixed (blocker)
+- `plugin.json` moved from `skills/testing-aiogram-bots/plugin.json` to `skills/testing-aiogram-bots/.claude-plugin/plugin.json`. Per [Claude Code plugin spec](https://code.claude.com/docs/en/plugins-reference), the manifest **must** live in `<plugin-root>/.claude-plugin/plugin.json`. With the old location Claude Code did not load it as a manifest — falling back to directory-name and skipping author/repository metadata. `claude plugin validate --strict` now passes.
+- Removed `"strict": false` from `marketplace.json` — it was a misuse. `strict: false` only matters when the marketplace entry and `plugin.json` declare overlapping components; ours never did.
+
+### Changed
+- CI: replaced fragile "skip first 13 lines" diff with a `--- BEGIN VENDORED CONTENT` sentinel marker in `mocked_bot.py`. Header can now grow/shrink freely without breaking the upstream-drift check.
+- CI: added a `Cross-check version sync` step — fails the build if `plugin.json` and `marketplace.json` disagree on version.
+- CI: added a `claude plugin validate --strict` job (soft-fail until the CLI is reliably available in Actions runners).
+- SKILL.md + SKILL.ru.md Common Mistakes: the router-singleton row now recommends building a fresh `Router()` via a factory **first**, before the `_parent_router = None` workaround. Pokes-private-attributes was the lead recommendation; it shouldn't be.
+- SKILL.md + SKILL.ru.md FSM section: added a note that `StatesGroup` must live next to handlers (not inline in tests), or assertions compare two different `State` objects.
+- Credits in SKILL.md, SKILL.ru.md, README: `@fugguri` link text → `@Fugguri` (canonical case).
+- `.github/ISSUE_TEMPLATE/bug_report.md`: Russian section name (`Порядок очередей в MockedSession`) → English (`Queue ordering in MockedSession`) — matches the EN-primary SKILL.md.
+
 ## [0.4.1] — 2026-05-20
 
 ### Fixed
@@ -73,6 +88,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.4.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.3.0

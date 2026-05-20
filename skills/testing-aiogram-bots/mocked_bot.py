@@ -11,6 +11,7 @@
 #     https://raw.githubusercontent.com/aiogram/aiogram/dev-3.x/tests/mocked_bot.py
 # Then bump the SHA above and the version in plugin.json.
 # --------------------------------------------------------------------------- #
+# --- BEGIN VENDORED CONTENT (do not edit above this line; CI checks below) ---
 from collections import deque
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any

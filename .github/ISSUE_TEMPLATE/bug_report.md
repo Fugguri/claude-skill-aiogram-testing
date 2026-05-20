@@ -25,6 +25,6 @@ labels: bug
 
 **Expected vs actual**
 
-**Did you check the `Common Mistakes` and `Порядок очередей в MockedSession` sections of `SKILL.md`?**
+**Did you check the `Common Mistakes` and `Queue ordering in MockedSession` sections of `SKILL.md`?**
 - [ ] Yes
 - [ ] No

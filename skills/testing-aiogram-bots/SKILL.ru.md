@@ -259,7 +259,9 @@ async def test_age_input_advances_state(bot, dp, make_message_update, stub_messa
     assert data["age"] == 25
 ```
 
-> Заметь: `Onboarding.waiting_height.state` (строка `"Onboarding:waiting_height"`), не сам объект `State`. `FSMContext.get_state()` возвращает строку.
+> Заметки:
+> 1. `Onboarding.waiting_height.state` (строка `"Onboarding:waiting_height"`), не сам объект `State`. `FSMContext.get_state()` возвращает строку.
+> 2. В реальном коде клади `Onboarding` рядом с хендлерами (например, `handlers/start.py`) и в тесте делай `from handlers.start import Onboarding`. Объявление `StatesGroup` прямо в тестовом файле = тест и хендлер ссылаются на **разные** `State`-объекты, и assertion молча падает.
 
 ## Callback Query тест — пример
 
@@ -358,7 +360,7 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Вызов хендлера напрямую (`await cmd_start(message)`) | Тест проходит, а на проде баг | Используй `dp.feed_update` — иначе обходишь filters/middleware/FSM |
 | Нет `tests/__init__.py` (только в `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Либо создать пустой `__init__.py` + `pythonpath = ["."]`, либо использовать pytest 8+ дефолт `import_mode=importlib` (без `__init__.py`) |
 | `asyncio_mode` не настроен | `Async test functions are not natively supported` | `asyncio_mode = "auto"` в `pyproject.toml` или `@pytest.mark.asyncio` на каждый тест |
-| Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | В фикстуре `dp` перед `include_router` сбросить: `router._parent_router = None`. Альтернатива — создавать `Router()` внутри фикстуры (если архитектура позволяет), или использовать `importlib.reload(handlers.start)` (тяжёлый вариант) |
+| Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | **Предпочтительно:** строить свежий `Router()` внутри фикстуры и регистрировать хендлеры через factory (`def make_router(): ...` в модуле хендлеров). **Быстрый обход** (если рефакторинг сейчас не вариант): `router._parent_router = None` перед `include_router`. **Крайний случай:** `importlib.reload(handlers.start)` (тяжело, ломает identity-сравнения). |
 
 ## Когда НЕ использовать этот подход
 
@@ -414,4 +416,4 @@ async def test_handler_direct():
 **Обсуждение тестирования:**
 - [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread, открыт с 2020, официального API так и нет — отсюда необходимость vendoring
 
-**Упаковка в скил:** [@fugguri](https://github.com/Fugguri)
+**Упаковка в скил:** [@Fugguri](https://github.com/Fugguri)

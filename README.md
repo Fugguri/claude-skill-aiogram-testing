@@ -75,7 +75,7 @@ This skill packages a community testing pattern — it does not invent it. All c
 **Reference discussion:**
 - [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread on testing strategy, open since 2020
 
-**This skill packaging:** [@fugguri](https://github.com/Fugguri) — wrote the SKILL.md instructions, AI-specific hallucination guardrails, examples, and packaged everything as a Claude Code plugin.
+**This skill packaging:** [@Fugguri](https://github.com/Fugguri) — wrote the SKILL.md instructions, AI-specific hallucination guardrails, examples, and packaged everything as a Claude Code plugin.
 
 ## License
 

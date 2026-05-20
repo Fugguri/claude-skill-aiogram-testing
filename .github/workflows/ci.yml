@@ -34,23 +34,47 @@ jobs:
         run: pytest -v
 
   validate-manifests:
-    name: validate JSON manifests
+    name: validate plugin manifests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Validate plugin.json
         run: |
-          python -c "import json, sys; json.load(open('skills/testing-aiogram-bots/plugin.json'))"
+          python -c "import json; json.load(open('skills/testing-aiogram-bots/.claude-plugin/plugin.json'))"
+
       - name: Validate marketplace.json
         run: |
-          python -c "import json, sys; json.load(open('.claude-plugin/marketplace.json'))"
-      - name: Verify mocked_bot.py unchanged from pinned upstream
+          python -c "import json; json.load(open('.claude-plugin/marketplace.json'))"
+
+      - name: Cross-check version sync
         run: |
+          v_plugin=$(python -c "import json; print(json.load(open('skills/testing-aiogram-bots/.claude-plugin/plugin.json'))['version'])")
+          v_mkt=$(python -c "import json; print(json.load(open('.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
+          test "$v_plugin" = "$v_mkt" || { echo "version mismatch: plugin.json=$v_plugin vs marketplace=$v_mkt"; exit 1; }
+          echo "version $v_plugin in sync"
+
+      - name: Verify mocked_bot.py matches pinned upstream
+        run: |
+          set -euo pipefail
           pinned=$(grep -oE 'Pinned SHA:\s+[a-f0-9]{40}' skills/testing-aiogram-bots/mocked_bot.py | awk '{print $NF}')
           test -n "$pinned" || { echo "no pinned SHA in mocked_bot.py header"; exit 1; }
           curl -fsSL "https://raw.githubusercontent.com/aiogram/aiogram/${pinned}/tests/mocked_bot.py" -o /tmp/upstream.py
-          # Skip the pin header (first 13 lines) when comparing
-          tail -n +14 skills/testing-aiogram-bots/mocked_bot.py | diff /tmp/upstream.py - || {
+          # Extract everything AFTER the BEGIN VENDORED sentinel
+          awk '/--- BEGIN VENDORED CONTENT/{found=1; next} found' skills/testing-aiogram-bots/mocked_bot.py > /tmp/vendored.py
+          diff /tmp/upstream.py /tmp/vendored.py || {
             echo "vendored mocked_bot.py drifted from pinned SHA ${pinned}"
+            echo "If you intentionally updated, refresh the SHA in mocked_bot.py header"
             exit 1
           }
+
+  validate-plugin:
+    name: claude plugin validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validate plugin manifest
+        run: claude plugin validate skills/testing-aiogram-bots --strict
+        continue-on-error: true  # CLI may not be available in all CI envs; soft-fail until stable
