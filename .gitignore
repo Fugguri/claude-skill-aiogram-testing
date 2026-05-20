@@ -8,3 +8,6 @@ __pycache__/
 .idea/
 .vscode/
 .pytest_cache/
+examples/.venv/
+examples/.pytest_cache/
+examples/**/__pycache__/

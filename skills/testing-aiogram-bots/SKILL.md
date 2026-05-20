@@ -1,6 +1,6 @@
 ---
 name: testing-aiogram-bots
-description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot — covers MockedBot setup, dispatching Update objects, asserting outgoing API calls, and FSM state checks
+description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot — covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
 ---
 
 # Testing aiogram 3.x bots
@@ -43,19 +43,27 @@ curl -o tests/mocked_bot.py https://raw.githubusercontent.com/aiogram/aiogram/de
 ```
 
 ### 3. pyproject.toml — конфиг pytest
+
+**Pytest 8+ (рекомендуемый, дефолтный `import_mode=importlib`):**
 ```toml
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]   # ВАЖНО: чтобы `from tests.mocked_bot import MockedBot` резолвилось
 ```
+Этого достаточно. `tests/__init__.py` не нужен, `pythonpath` не нужен — `importlib` mode сам разруливает.
 
-Без `pythonpath = ["."]` получишь `ModuleNotFoundError: No module named 'tests.mocked_bot'` — pytest не добавит корень проекта в sys.path автоматически (поведение `import_mode=prepend` смотрит на `rootdir`/`conftest.py`, не на корень проекта).
-
-### 4. tests/__init__.py — пустой файл (чтобы pytest нашёл `mocked_bot`)
+**Pytest <8 ИЛИ `import_mode = "prepend"` (старый дефолт):**
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]   # чтобы `from tests.mocked_bot import MockedBot` резолвилось
+```
++ создать пустой `tests/__init__.py`:
 ```bash
 touch tests/__init__.py
 ```
+Без этого получишь `ModuleNotFoundError: No module named 'tests.mocked_bot'`.
 
 ## Минимальный пример: тест /start
 
@@ -77,6 +85,7 @@ async def cmd_start(message: Message):
 ```python
 # tests/conftest.py
 from datetime import datetime
+from itertools import count
 
 import pytest
 from aiogram import Dispatcher
@@ -94,6 +103,11 @@ def bot() -> MockedBot:
 @pytest.fixture
 def dp() -> Dispatcher:
     from handlers.start import router
+
+    # Router — module-level singleton. После первого include_router у него выставлен
+    # _parent_router; следующий тест упадёт с `Router is already attached to ...`.
+    router._parent_router = None  # type: ignore[attr-defined]
+
     d = Dispatcher(storage=MemoryStorage())
     d.include_router(router)
     return d
@@ -112,14 +126,14 @@ def _chat(chat_id: int = 1) -> Chat:
 @pytest.fixture
 def make_message_update():
     """Фабрика Update с Message. `update = make_message_update("/start")`."""
-    counter = {"n": 0}
+    ids = count(1)
 
     def _factory(text: str, *, user_id: int = 1, chat_id: int = 1) -> Update:
-        counter["n"] += 1
+        n = next(ids)
         return Update(
-            update_id=counter["n"],
+            update_id=n,
             message=Message(
-                message_id=counter["n"],
+                message_id=n,
                 date=datetime.now(),
                 chat=_chat(chat_id),
                 from_user=_user(user_id),
@@ -133,19 +147,19 @@ def make_message_update():
 @pytest.fixture
 def make_callback_update():
     """Фабрика Update с CallbackQuery. `update = make_callback_update("confirm")`."""
-    counter = {"n": 0}
+    ids = count(1)
 
-    def _factory(data: str, *, user_id: int = 1, chat_id: int = 1, message_id: int = 1) -> Update:
-        counter["n"] += 1
+    def _factory(data: str, *, user_id: int = 1, chat_id: int = 1) -> Update:
+        n = next(ids)
         return Update(
-            update_id=counter["n"],
+            update_id=n,
             callback_query=CallbackQuery(
-                id=str(counter["n"]),
+                id=str(n),
                 from_user=_user(user_id),
                 chat_instance="ci",
                 data=data,
                 message=Message(
-                    message_id=message_id,
+                    message_id=n,
                     date=datetime.now(),
                     chat=_chat(chat_id),
                     text="prompt",
@@ -194,15 +208,28 @@ async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_me
 
 | Что нужно | Как |
 |-----------|-----|
-| Создать бот | `MockedBot()` (токен подставится "42:TEST") |
+| Создать бот | `MockedBot()` (токен подставится `"42:TEST"`) |
 | Подготовить ответ Telegram | `bot.add_result_for(SendMessage, ok=True, result=Message(...))` — **до** `feed_update`, по одному на каждый исходящий вызов |
 | Прокачать апдейт через диспатчер | `await dp.feed_update(bot, Update(...))` |
-| Проверить последний вызов API | `bot.get_request()` — возвращает объект `TelegramMethod` (`SendMessage`, `EditMessageText`, etc.), `.pop()` из deque |
-| Проверить все вызовы | `list(bot.session.requests)` — deque всех вызовов в порядке поступления |
+| Проверить последний вызов API | `bot.get_request()` — `.pop()` из deque (см. таблицу порядка ниже) |
+| Проверить все вызовы | `list(bot.session.requests)` — порядок вызовов |
 | Получить state в FSM | `ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)` (синхронно) → `await ctx.get_state()` |
 | Установить state до теста | `await ctx.set_state(MyStates.waiting)` |
 | Проверить data в FSM | `await ctx.get_data()` |
 | Прокачать callback_query | `Update(update_id=1, callback_query=CallbackQuery(...))` |
+
+## Порядок очередей в MockedSession (важно)
+
+`MockedSession` использует два `collections.deque` с `.append()` + `.pop()` справа. Это **LIFO**. Отсюда — два правила, которые путают чаще всего:
+
+| Очередь | Доступ | Порядок | Как использовать |
+|---------|--------|---------|------------------|
+| `session.responses` (ответы, которые ты готовишь) | `bot.add_result_for(...)` записывает справа, `make_request` читает через `.pop()` справа | **LIFO** | Если хендлер делает 2 вызова в порядке `A → B`, готовь ответы в обратном порядке: сначала `add_result_for(B, ...)`, затем `add_result_for(A, ...)`. Первым `pop()` достанется ответ A (соответствует первому вызову), вторым — ответ B. |
+| `session.requests` (исходящие вызовы, которые сделал хендлер) | `make_request` пишет справа через `.append()` | **FIFO via `list(bot.session.requests)`** (итерация deque = порядок вставки) — **LIFO via `bot.get_request()`** (`.pop()` справа) | Для проверки полной хронологии: `list(bot.session.requests)` — даёт `[первый, ..., последний]`. Для проверки конкретно последнего: `bot.get_request()`. |
+
+**Мнемоника:**
+- *responses* — добавляй задом наперёд («стек ответов»)
+- *requests* — читай через `list()` чтобы увидеть в порядке вызовов
 
 ## FSM-тест — пример
 
@@ -239,10 +266,10 @@ from aiogram.methods import AnswerCallbackQuery, EditMessageText
 
 
 async def test_confirm_button_edits_message(bot, dp, make_callback_update):
-    # Ответы — в обратном порядке вызовов (deque LIFO!):
-    # хендлер сначала EditMessageText, потом answer() callback → готовим в обратке
-    bot.add_result_for(AnswerCallbackQuery, ok=True, result=True)
-    bot.add_result_for(EditMessageText, ok=True, result=True)
+    # Хендлер выполняет: EditMessageText (1-й вызов), затем answer() (2-й вызов).
+    # responses — LIFO. Добавляем ответ на ПОСЛЕДНИЙ вызов первым, на первый — последним:
+    bot.add_result_for(AnswerCallbackQuery, ok=True, result=True)  # ответ на 2-й вызов
+    bot.add_result_for(EditMessageText, ok=True, result=True)      # ответ на 1-й вызов (на верху стека)
 
     await dp.feed_update(bot, make_callback_update("confirm"))
 
@@ -251,18 +278,84 @@ async def test_confirm_button_edits_message(bot, dp, make_callback_update):
     assert any(isinstance(c, AnswerCallbackQuery) for c in all_calls)
 ```
 
+## Тест middleware
+
+Middleware регистрируется на `Dispatcher` или `Router` и срабатывает при `feed_update` — значит ловится тем же подходом. Проверяем: middleware **выполнилось** (например, положило что-то в `data`) и хендлер **получил** это значение.
+
+```python
+# middlewares/auth.py
+from typing import Any, Awaitable, Callable, Dict
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+
+
+class AuthMiddleware(BaseMiddleware):
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
+        data["user_role"] = "admin" if data["event_from_user"].id == 1 else "guest"
+        return await handler(event, data)
+```
+
+```python
+# tests/test_auth_middleware.py
+from aiogram import Dispatcher, Router
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.methods import SendMessage
+from aiogram.types import Message
+
+import pytest
+
+from middlewares.auth import AuthMiddleware
+
+
+@pytest.fixture
+def dp_with_auth():
+    router = Router()
+    seen = {}
+
+    @router.message()
+    async def capture(message: Message, user_role: str):
+        seen["role"] = user_role
+        await message.answer("ok")
+
+    d = Dispatcher(storage=MemoryStorage())
+    d.message.middleware(AuthMiddleware())
+    d.include_router(router)
+    d._captured = seen  # тестовый канал наружу
+    return d
+
+
+async def test_admin_user_gets_admin_role(bot, dp_with_auth, make_message_update, stub_message):
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
+    await dp_with_auth.feed_update(bot, make_message_update("hi", user_id=1))
+    assert dp_with_auth._captured["role"] == "admin"
+
+
+async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update, stub_message):
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
+    await dp_with_auth.feed_update(bot, make_message_update("hi", user_id=42))
+    assert dp_with_auth._captured["role"] == "guest"
+```
+
+**Ключевое:** не вызывай middleware напрямую как функцию — теряешь интеграцию с диспатчером (порядок middlewares, outer vs inner, `event_from_user` inject). Прогоняй через `dp.feed_update`.
+
 ## Common Mistakes
 
 | Ошибка | Симптом | Фикс |
 |--------|---------|------|
 | Не подготовил `add_result_for` | `IndexError: pop from an empty deque` | Готовь ответ ПЕРЕД каждым ожидаемым вызовом |
 | Хендлер шлёт 2 сообщения, ответ один | `IndexError` на втором вызове | `add_result_for` дважды |
-| Хендлер шлёт `SendMessage`, потом `AnswerCallbackQuery` — pydantic ругается «expected Message, got bool» | `MockedSession.responses` это deque, `.pop()` справа = **LIFO** | Добавляй ответы в **обратном** порядке вызовов: сначала ответ на последний вызов, в конце — на первый |
+| Хендлер шлёт `SendMessage`, потом `AnswerCallbackQuery` — pydantic ругается «expected Message, got bool» | `session.responses` это LIFO-стек | Добавляй ответ на **последний** вызов первым, на **первый** — последним (см. секцию «Порядок очередей в MockedSession») |
 | `from aiogram.test_utils.*` | `ModuleNotFoundError` | Скопировать `mocked_bot.py` к себе, импорт `from tests.mocked_bot import MockedBot` |
 | `from_user=None` в Message | `TypeError` или фильтр не срабатывает | Всегда заполняй `from_user=User(...)` |
 | Вызов хендлера напрямую (`await cmd_start(message)`) | Тест проходит, а на проде баг | Используй `dp.feed_update` — иначе обходишь filters/middleware/FSM |
-| Нет `tests/__init__.py` | `ModuleNotFoundError: tests.mocked_bot` | Создать пустой `__init__.py` |
+| Нет `tests/__init__.py` (только в `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Либо создать пустой `__init__.py` + `pythonpath = ["."]`, либо использовать pytest 8+ дефолт `import_mode=importlib` (без `__init__.py`) |
 | `asyncio_mode` не настроен | `Async test functions are not natively supported` | `asyncio_mode = "auto"` в `pyproject.toml` или `@pytest.mark.asyncio` на каждый тест |
+| Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | В фикстуре `dp` перед `include_router` сбросить: `router._parent_router = None`. Альтернатива — создавать `Router()` внутри фикстуры (если архитектура позволяет), или использовать `importlib.reload(handlers.start)` (тяжёлый вариант) |
 
 ## Когда НЕ использовать этот подход
 
@@ -275,14 +368,24 @@ async def test_confirm_button_edits_message(bot, dp, make_callback_update):
 `AsyncMock(spec=Bot)` + прямой вызов хендлера. Подходит, когда хендлер — простая функция и filters/middlewares не важны:
 
 ```python
+from datetime import datetime
 from unittest.mock import AsyncMock
+
+from aiogram import Bot
+from aiogram.types import Chat, Message, User
+
+from handlers.start import cmd_start
+
 
 async def test_handler_direct():
     bot = AsyncMock(spec=Bot)
-    msg = Message(message_id=1, date=datetime.now(),
-                  chat=Chat(id=1, type="private"),
-                  from_user=User(id=1, is_bot=False, first_name="T"),
-                  text="/start")
+    msg = Message(
+        message_id=1,
+        date=datetime.now(),
+        chat=Chat(id=1, type="private"),
+        from_user=User(id=1, is_bot=False, first_name="T"),
+        text="/start",
+    )
     msg = msg.model_copy(update={"bot": bot})
     await cmd_start(msg)
     bot.send_message.assert_called_once()

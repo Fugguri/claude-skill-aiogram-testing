@@ -29,20 +29,24 @@ The actual canonical approach: copy `MockedBot` from `aiogram/aiogram` repo (`te
 ### Option A: Claude Code plugin (recommended)
 
 ```
-/plugin marketplace add fugguri/claude-skill-aiogram-testing
+/plugin marketplace add Fugguri/claude-skill-aiogram-testing
 /plugin install testing-aiogram-bots@fugguri-aiogram-testing
 ```
 
 ### Option B: Manual
 
 ```bash
-git clone https://github.com/fugguri/claude-skill-aiogram-testing.git
+git clone https://github.com/Fugguri/claude-skill-aiogram-testing.git
 cp -r claude-skill-aiogram-testing/skills/testing-aiogram-bots ~/.claude/skills/
 ```
 
 ## Usage
 
 When working on an aiogram project, ask Claude to "write tests for this handler" or "add pytest coverage for the FSM flow" — the skill auto-activates and follows the included workflow.
+
+## Language note
+
+The `SKILL.md` body is written in **Russian** (the AI consumes Markdown of any language equally well, and the author writes in Russian). Code examples are language-neutral Python. The frontmatter `description`, this README, and `CHANGELOG.md` are in English. PRs translating `SKILL.md` to English (as `SKILL.en.md`) are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contents
 
