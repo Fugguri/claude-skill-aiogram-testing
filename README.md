@@ -53,7 +53,22 @@ When working on an aiogram project, ask Claude to "write tests for this handler"
 
 ## Credits
 
-`mocked_bot.py` is copied from [aiogram/aiogram](https://github.com/aiogram/aiogram) (`tests/mocked_bot.py`, MIT licensed). All credit to the aiogram maintainers.
+This skill packages a community testing pattern — it does not invent it. All credit for the underlying approach and `mocked_bot.py` belongs to the aiogram team and community.
+
+**aiogram framework and `mocked_bot.py`:**
+- [aiogram/aiogram](https://github.com/aiogram/aiogram) — the framework (MIT)
+- [`tests/mocked_bot.py`](https://github.com/aiogram/aiogram/blob/dev-3.x/tests/mocked_bot.py) — vendored verbatim, copyright aiogram contributors
+
+**aiogram maintainers & key contributors:**
+- [@JrooTJunior](https://github.com/JrooTJunior) (Alex Root Junior) — aiogram creator and lead maintainer
+- [@Olegt0rr](https://github.com/Olegt0rr) — core maintainer, aiogram 3 architecture
+- [@MrMrRobat](https://github.com/MrMrRobat) — core contributor
+- [aiogram contributors](https://github.com/aiogram/aiogram/graphs/contributors) — full list
+
+**Reference discussion:**
+- [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread on testing strategy, open since 2020
+
+**This skill packaging:** [@fugguri](https://github.com/Fugguri) — wrote the SKILL.md instructions, AI-specific hallucination guardrails, examples, and packaged everything as a Claude Code plugin.
 
 ## License
 

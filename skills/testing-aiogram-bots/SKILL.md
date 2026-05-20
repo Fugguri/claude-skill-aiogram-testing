@@ -76,9 +76,12 @@ async def cmd_start(message: Message):
 **conftest.py:**
 ```python
 # tests/conftest.py
+from datetime import datetime
+
 import pytest
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
 from tests.mocked_bot import MockedBot
 
@@ -94,49 +97,96 @@ def dp() -> Dispatcher:
     d = Dispatcher(storage=MemoryStorage())
     d.include_router(router)
     return d
+
+
+# --- helpers: убирают бойлерплейт из тестов ---
+
+def _user(user_id: int = 1) -> User:
+    return User(id=user_id, is_bot=False, first_name="Test")
+
+
+def _chat(chat_id: int = 1) -> Chat:
+    return Chat(id=chat_id, type="private")
+
+
+@pytest.fixture
+def make_message_update():
+    """Фабрика Update с Message. `update = make_message_update("/start")`."""
+    counter = {"n": 0}
+
+    def _factory(text: str, *, user_id: int = 1, chat_id: int = 1) -> Update:
+        counter["n"] += 1
+        return Update(
+            update_id=counter["n"],
+            message=Message(
+                message_id=counter["n"],
+                date=datetime.now(),
+                chat=_chat(chat_id),
+                from_user=_user(user_id),
+                text=text,
+            ),
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def make_callback_update():
+    """Фабрика Update с CallbackQuery. `update = make_callback_update("confirm")`."""
+    counter = {"n": 0}
+
+    def _factory(data: str, *, user_id: int = 1, chat_id: int = 1, message_id: int = 1) -> Update:
+        counter["n"] += 1
+        return Update(
+            update_id=counter["n"],
+            callback_query=CallbackQuery(
+                id=str(counter["n"]),
+                from_user=_user(user_id),
+                chat_instance="ci",
+                data=data,
+                message=Message(
+                    message_id=message_id,
+                    date=datetime.now(),
+                    chat=_chat(chat_id),
+                    text="prompt",
+                ),
+            ),
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def stub_message():
+    """Готовый Message для add_result_for(SendMessage, ...)."""
+    return Message(
+        message_id=999,
+        date=datetime.now(),
+        chat=_chat(),
+        text="ok",
+    )
 ```
 
 **Тест:**
 ```python
 # tests/test_start.py
-from datetime import datetime
-
 from aiogram.methods import SendMessage
-from aiogram.types import Chat, Message, Update, User
 
 
-async def test_start_replies_with_greeting(bot, dp):
+async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_message):
     # ВАЖНО: MockedBot требует подготовить ответ Telegram заранее,
-    # иначе session.responses будет пуст и make_request упадёт IndexError.
-    bot.add_result_for(
-        SendMessage,
-        ok=True,
-        result=Message(
-            message_id=2,
-            date=datetime.now(),
-            chat=Chat(id=1, type="private"),
-            text="ok",
-        ),
-    )
+    # иначе session.responses пуст и make_request упадёт IndexError.
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
 
-    update = Update(
-        update_id=1,
-        message=Message(
-            message_id=1,
-            date=datetime.now(),
-            chat=Chat(id=1, type="private"),
-            from_user=User(id=1, is_bot=False, first_name="Test"),
-            text="/start",
-        ),
-    )
+    await dp.feed_update(bot, make_message_update("/start"))
 
-    await dp.feed_update(bot, update)
-
-    sent = bot.get_request()  # последний вызванный метод API
+    sent = bot.get_request()  # последний вызванный метод API (LIFO)
     assert isinstance(sent, SendMessage)
     assert sent.chat_id == 1
     assert "Привет" in sent.text
 ```
+
+Видишь — благодаря фикстурам `make_message_update` и `stub_message` (см. conftest выше) тест помещается в 5 строк вместо 30. Без фабрик каждый тест тонет в `Update/Message/Chat/User`-бойлерплейте.
 
 **Запуск:** `pytest -v` (или `uv run pytest -v`).
 
@@ -158,31 +208,47 @@ async def test_start_replies_with_greeting(bot, dp):
 
 ```python
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.methods import SendMessage
+
 
 class Onboarding(StatesGroup):
     waiting_age = State()
+    waiting_height = State()  # следующее состояние после ввода возраста
 
-async def test_age_input_advances_state(bot, dp):
-    # Поставить начальное состояние
+
+async def test_age_input_advances_state(bot, dp, make_message_update, stub_message):
     ctx = dp.fsm.resolve_context(bot, chat_id=1, user_id=1)
     await ctx.set_state(Onboarding.waiting_age)
 
-    bot.add_result_for(SendMessage, ok=True, result=Message(
-        message_id=2, date=datetime.now(),
-        chat=Chat(id=1, type="private"), text="ok"))
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
 
-    update = Update(update_id=1, message=Message(
-        message_id=1, date=datetime.now(),
-        chat=Chat(id=1, type="private"),
-        from_user=User(id=1, is_bot=False, first_name="T"),
-        text="25"))
-
-    await dp.feed_update(bot, update)
+    await dp.feed_update(bot, make_message_update("25"))
 
     new_state = await ctx.get_state()
     data = await ctx.get_data()
-    assert new_state == Onboarding.waiting_height
+    assert new_state == Onboarding.waiting_height.state
     assert data["age"] == 25
+```
+
+> Заметь: `Onboarding.waiting_height.state` (строка `"Onboarding:waiting_height"`), не сам объект `State`. `FSMContext.get_state()` возвращает строку.
+
+## Callback Query тест — пример
+
+```python
+from aiogram.methods import AnswerCallbackQuery, EditMessageText
+
+
+async def test_confirm_button_edits_message(bot, dp, make_callback_update):
+    # Ответы — в обратном порядке вызовов (deque LIFO!):
+    # хендлер сначала EditMessageText, потом answer() callback → готовим в обратке
+    bot.add_result_for(AnswerCallbackQuery, ok=True, result=True)
+    bot.add_result_for(EditMessageText, ok=True, result=True)
+
+    await dp.feed_update(bot, make_callback_update("confirm"))
+
+    all_calls = list(bot.session.requests)
+    assert any(isinstance(c, EditMessageText) for c in all_calls)
+    assert any(isinstance(c, AnswerCallbackQuery) for c in all_calls)
 ```
 
 ## Common Mistakes
@@ -224,8 +290,22 @@ async def test_handler_direct():
 
 **Минус:** не проходит через `Dispatcher` → не ловит баги фильтров, состояний, middleware. Не используй для критичных сценариев.
 
-## Источники
+## Источники и кредиты
 
-- [aiogram/aiogram dev-3.x — tests/mocked_bot.py](https://github.com/aiogram/aiogram/blob/dev-3.x/tests/mocked_bot.py) — эталонный `MockedBot`, обновляется командой aiogram
-- [aiogram/aiogram tests/dispatcher](https://github.com/aiogram/aiogram/tree/dev-3.x/tests/dispatcher) — реальные примеры от мейнтейнеров
-- [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — обсуждение тестирования (открыто с 2020, официального решения нет)
+Этот скил **упаковывает community-паттерн**, а не изобретает его. Кредиты:
+
+**aiogram framework и MockedBot:**
+- [aiogram/aiogram](https://github.com/aiogram/aiogram) — фреймворк (MIT)
+- [`tests/mocked_bot.py`](https://github.com/aiogram/aiogram/blob/dev-3.x/tests/mocked_bot.py) — эталонный `MockedBot`, vendored as-is
+- [`tests/dispatcher`](https://github.com/aiogram/aiogram/tree/dev-3.x/tests/dispatcher) — реальные примеры от команды
+
+**Мейнтейнеры aiogram:**
+- [@JrooTJunior](https://github.com/JrooTJunior) (Alex Root Junior) — создатель и lead-мейнтейнер
+- [@Olegt0rr](https://github.com/Olegt0rr) — core-мейнтейнер, архитектура aiogram 3
+- [@MrMrRobat](https://github.com/MrMrRobat) — core-контрибьютор
+- [full list](https://github.com/aiogram/aiogram/graphs/contributors)
+
+**Обсуждение тестирования:**
+- [aiogram issue #378](https://github.com/aiogram/aiogram/issues/378) — community thread, открыт с 2020, официального API так и нет — отсюда необходимость vendoring
+
+**Упаковка в скил:** [@fugguri](https://github.com/Fugguri)

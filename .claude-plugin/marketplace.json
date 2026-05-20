@@ -10,7 +10,7 @@
       "name": "testing-aiogram-bots",
       "source": "./skills/testing-aiogram-bots",
       "description": "Pytest testing skill for aiogram 3.x — MockedBot, Update dispatch, FSM assertions, no live bot, no network.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "testing",
       "tags": ["aiogram", "telegram", "pytest", "python", "testing", "fsm", "mockedbot"],
       "strict": false
