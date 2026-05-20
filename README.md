@@ -1,5 +1,12 @@
 # claude-skill-aiogram-testing
 
+[![CI](https://github.com/Fugguri/claude-skill-aiogram-testing/actions/workflows/ci.yml/badge.svg)](https://github.com/Fugguri/claude-skill-aiogram-testing/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![aiogram](https://img.shields.io/badge/aiogram-3.13%20%7C%203.20%20%7C%203.28-blue.svg)](https://github.com/aiogram/aiogram)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-orange.svg)](https://code.claude.com/docs/en/plugins-reference)
+[![Version](https://img.shields.io/github/v/tag/Fugguri/claude-skill-aiogram-testing?label=version&sort=semver)](CHANGELOG.md)
+
 A [Claude Code](https://docs.claude.com/en/docs/claude-code) skill for writing pytest tests for **aiogram 3.x** Telegram bot handlers — without launching a live bot and without network.
 
 ## What it does
