@@ -8,6 +8,33 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 _Nothing yet — pending changes land here._
 
+## [0.6.0] — 2026-05-20
+
+### Added
+- **`make_inline_query_update` factory** in `conftest.py` (and documented in both SKILL.md and SKILL.ru.md). InlineQuery is one of the three most common update types and was missing from the public surface.
+- **`@router.inline_query()` example handler** in `examples/handlers/start.py` + matching test `examples/tests/test_inline.py`.
+- **`@router.error()` handler example** in `examples/handlers/start.py` + matching test `examples/tests/test_error_handler.py`. Documents two assertion strategies: (1) assert on the recovery API call the error handler makes, (2) `pytest.raises` when no error handler is registered.
+- **Error handler test section** in SKILL.md + SKILL.ru.md explaining the silent-swallow trap: `dp.feed_update` does NOT re-raise when `@router.error()` is registered, so "no exception escaped" is not a valid assertion.
+- **Inline query test section** in both docs.
+- **Extending-the-factories note** with a pointer to the aiogram `Update` model and the recipe (field name → payload type with minimal valid fields → wrap in `Update(...)`).
+- **Quick Reference rows for:** inline_query dispatch, cleanup between sub-scenarios (`bot.session.responses.clear()` / `requests.clear()`), passing a custom token (`MockedBot(token="...")`).
+- **Common Mistakes rows for:**
+  - error handler silently swallowing exceptions
+  - album messages (`media_group`) — aiogram doesn't bundle photos into one event
+  - fixture-scope leak between tests via shared deque state
+- **README "Demo" section** showing the install → first-test loop as ASCII transcript.
+
+### Changed
+- Frontmatter `description` (both files) shortened from ~440 chars to ~280, now explicitly mentions Message + CallbackQuery + InlineQuery + FSM + middleware + error handlers.
+- `marketplace.json` `description` extended to mention error handlers and middleware coverage.
+- `examples/handlers/start.py` import list now includes `Command`, `InlineQuery`, `InlineQueryResultArticle`, `InputTextMessageContent` (needed for the new examples).
+- `scripts/check_doc_sync.py` refactored to support `"examples_only"` scope for snippets that intentionally live only in the runnable code (full handler bodies that the docs reference by behavior, not verbatim).
+
+### Verified
+- `python scripts/check_doc_sync.py` → 12 full triples + 4 examples-only snippets in sync (16 total).
+- `pytest examples/` → **7/7** locally (was 5/5 in 0.5.x); CI runs the same against the full Python × aiogram matrix.
+- `claude plugin validate skills/testing-aiogram-bots --strict` → passed.
+
 ## [0.5.2] — 2026-05-20
 
 ### Fixed
@@ -140,6 +167,7 @@ _Nothing yet — pending changes land here._
 - `plugin.json` and `.claude-plugin/marketplace.json`.
 - MIT license.
 
+[0.6.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.6.0
 [0.5.2]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.2
 [0.5.1]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Fugguri/claude-skill-aiogram-testing/releases/tag/v0.5.0

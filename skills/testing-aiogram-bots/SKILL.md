@@ -1,6 +1,6 @@
 ---
 name: testing-aiogram-bots
-description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot. All test files MUST be created under tests/ (never at project root). Covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
+description: Use when writing pytest tests for aiogram 3.x bot handlers. All test files MUST be created under tests/ (never at project root). Covers MockedBot, Message/CallbackQuery/InlineQuery dispatch, FSM, middleware, error handlers — and blocks common AI hallucinations (no such module as aiogram.test_utils; aiogram-tests on PyPI is abandoned).
 ---
 
 # Testing aiogram 3.x bots
@@ -201,6 +201,26 @@ def make_callback_update():
 
 
 @pytest.fixture
+def make_inline_query_update():
+    """Update-with-InlineQuery factory. `update = make_inline_query_update("search me")`."""
+    ids = count(1)
+
+    def _factory(query: str, *, user_id: int = 1) -> Update:
+        n = next(ids)
+        return Update(
+            update_id=n,
+            inline_query=InlineQuery(
+                id=str(n),
+                from_user=_user(user_id),
+                query=query,
+                offset="",
+            ),
+        )
+
+    return _factory
+
+
+@pytest.fixture
 def stub_message():
     """Ready-made Message for add_result_for(SendMessage, ...)."""
     return Message(
@@ -210,6 +230,10 @@ def stub_message():
         text="ok",
     )
 ```
+
+> Add `InlineQuery` to the `aiogram.types` import at the top of the file.
+>
+> **Extending the factories.** For update types not shown — `my_chat_member`, `poll`, `chat_join_request`, etc. — follow the same pattern: take the field name from the [`Update` model](https://docs.aiogram.dev/en/latest/api/types/update.html), construct the corresponding payload type with the minimal valid fields, wrap it in `Update(update_id=..., <field>=...)`, return.
 
 **Test:**
 ```python
@@ -247,6 +271,9 @@ Notice — thanks to `make_message_update` and `stub_message` fixtures (see conf
 | Set FSM state before a test | `await ctx.set_state(MyStates.waiting)` |
 | Read FSM data | `await ctx.get_data()` |
 | Feed a callback_query | `await dp.feed_update(bot, make_callback_update("confirm"))` — see the `make_callback_update` fixture above |
+| Feed an inline_query | `await dp.feed_update(bot, make_inline_query_update("text"))` |
+| Reset queued responses between sub-scenarios in one test | `bot.session.responses.clear()` (and `bot.session.requests.clear()` for the other side) |
+| Pass a custom bot token | `MockedBot(token="123:ABC")` — the `kwargs.pop("token", ...)` accepts anything you give it; the default `"42:TEST"` is only used when omitted |
 
 ## Queue ordering in MockedSession (important)
 
@@ -308,6 +335,62 @@ async def test_confirm_button_edits_message(bot, dp, make_callback_update):
     all_calls = list(bot.session.requests)
     assert any(isinstance(c, EditMessageText) for c in all_calls)
     assert any(isinstance(c, AnswerCallbackQuery) for c in all_calls)
+```
+
+## Inline query test
+
+```python
+from aiogram.methods import AnswerInlineQuery
+
+
+async def test_inline_query_returns_one_result(bot, dp, make_inline_query_update):
+    bot.add_result_for(AnswerInlineQuery, ok=True, result=True)
+
+    await dp.feed_update(bot, make_inline_query_update("hello"))
+
+    sent = bot.get_request()
+    assert isinstance(sent, AnswerInlineQuery)
+    assert len(sent.results) == 1
+    assert "hello" in sent.results[0].title
+```
+
+## Error handler test
+
+aiogram **swallows exceptions raised by handlers** when an `@router.error()` is registered — `dp.feed_update` does not re-raise. The only observable proof that recovery ran is the API call your error handler makes. Verify that, not the absence of an exception.
+
+```python
+# handlers/start.py
+@router.message(Command("boom"))
+async def cmd_boom(message: Message) -> None:
+    raise RuntimeError("intentional crash")
+
+
+@router.error()
+async def on_error(event) -> bool:
+    if event.update.message:
+        await event.update.message.answer(f"Caught: {type(event.exception).__name__}")
+    return True  # mark handled
+
+
+# tests/test_error_handler.py
+from aiogram.methods import SendMessage
+
+
+async def test_error_handler_intercepts_crash(bot, dp, make_message_update, stub_message):
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
+
+    await dp.feed_update(bot, make_message_update("/boom"))
+
+    sent = bot.get_request()
+    assert isinstance(sent, SendMessage)
+    assert "Caught: RuntimeError" in sent.text
+```
+
+If there is no `@router.error()` registered, the exception propagates out of `feed_update` and your test crashes with the original traceback. That is also a valid (and often clearer) assertion target:
+```python
+import pytest
+with pytest.raises(RuntimeError, match="intentional crash"):
+    await dp.feed_update(bot, make_message_update("/boom"))
 ```
 
 ## Middleware test
@@ -388,6 +471,9 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Calling the handler directly (`await cmd_start(message)`) | Test passes, prod breaks | Use `dp.feed_update` — otherwise you bypass filters/middleware/FSM |
 | Missing `tests/__init__.py` (only in `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Either create an empty `__init__.py` + `pythonpath = ["."]`, or use the pytest 8+ default `import_mode=importlib` (no `__init__.py`) |
 | `asyncio_mode` not configured | `Async test functions are not natively supported` | `asyncio_mode = "auto"` in `pyproject.toml`, or `@pytest.mark.asyncio` on every test |
+| Test thinks it caught a bug because no exception bubbled out, but `@router.error()` silently swallowed it | `dp.feed_update` swallows handler exceptions **only when an error handler is registered**. Without one, exceptions propagate | Assert on the recovery API call your error handler makes (or temporarily un-register the error handler with `dp.errors.handlers = []`). See "Error handler test". |
+| Album messages (`media_group`) tested as a single update | Telegram delivers each photo as a separate `Update` with a shared `media_group_id`. aiogram does not bundle them into one event | Feed each photo with its own `Update` and the same `media_group_id`. If you need them as one event, use `aiogram.dispatcher.middlewares.user_context.UserContextMiddleware`-style buffering and test the buffer, not the raw stream. |
+| Responses queued in test A leak into test B (shared `MockedBot`) | `pytest` fixtures are function-scoped by default, but if you've widened scope to `module` or `session`, the deques persist | Either keep `bot` fixture function-scoped (default), or explicitly call `bot.session.responses.clear()` + `bot.session.requests.clear()` in a teardown |
 | Test files written to project root (`test_start.py` next to `main.py`) | `pytest` reports `collected 0 items`; or import errors because `from tests.mocked_bot import ...` does not resolve | All test files MUST live under `tests/`. See "Where tests live" at the top. Move the file to `tests/`, never the other way around. |
 | Second test fails with `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` is imported as a module-level singleton — after the first `include_router` its `_parent_router` is set | **Preferred:** build a fresh `Router()` inside the fixture and re-register handlers via a factory (`def make_router(): ...` in your handlers module). **Quick workaround if refactoring is out of scope:** `router._parent_router = None` before `include_router`. **Last resort:** `importlib.reload(handlers.start)` (heavy, breaks identity comparisons). |
 

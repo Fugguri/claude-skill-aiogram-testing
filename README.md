@@ -44,6 +44,40 @@ cp -r claude-skill-aiogram-testing/skills/testing-aiogram-bots ~/.claude/skills/
 
 When working on an aiogram project, ask Claude to "write tests for this handler" or "add pytest coverage for the FSM flow" — the skill auto-activates and follows the included workflow.
 
+## Demo (what installation + a test loop looks like)
+
+```text
+$ claude plugin marketplace add Fugguri/claude-skill-aiogram-testing
+Adding marketplace…
+Cloning via SSH: git@github.com:Fugguri/claude-skill-aiogram-testing.git
+✔ Successfully added marketplace: fugguri-aiogram-testing
+
+$ claude plugin install testing-aiogram-bots@fugguri-aiogram-testing
+✔ Successfully installed plugin: testing-aiogram-bots@fugguri-aiogram-testing
+
+$ claude
+> write me a pytest test for the /start handler in handlers/start.py
+
+  [skill: testing-aiogram-bots activated]
+  Following the documented layout — creating tests/conftest.py with the
+  MockedBot + factory fixtures, then tests/test_start.py.
+
+  ✓ tests/mocked_bot.py        (vendored from this skill)
+  ✓ tests/__init__.py
+  ✓ tests/conftest.py          (bot, dp, make_message_update, stub_message)
+  ✓ tests/test_start.py        (asserts SendMessage call, chat_id, reply text)
+
+  Running pytest -v tests/test_start.py …
+  tests/test_start.py::test_start_replies_with_greeting PASSED
+  1 passed in 0.21s
+```
+
+The skill instructs the model to (a) always place tests under `tests/`,
+(b) copy `mocked_bot.py` from the plugin into the project, (c) use the
+factory fixtures instead of building `Update`/`Message`/`Chat`/`User`
+objects manually, and (d) flag the typical hallucinations (`aiogram.test_utils`,
+`aiogram-tests`) before they reach the code.
+
 ## Languages
 
 - `SKILL.md` — English (primary)

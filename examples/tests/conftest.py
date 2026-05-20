@@ -4,7 +4,7 @@ from itertools import count
 import pytest
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import CallbackQuery, Chat, Message, Update, User
+from aiogram.types import CallbackQuery, Chat, InlineQuery, Message, Update, User
 
 from tests.mocked_bot import MockedBot
 
@@ -75,6 +75,26 @@ def make_callback_update():
                     chat=_chat(chat_id),
                     text="prompt",
                 ),
+            ),
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def make_inline_query_update():
+    """Update-with-InlineQuery factory. `update = make_inline_query_update("search me")`."""
+    ids = count(1)
+
+    def _factory(query: str, *, user_id: int = 1) -> Update:
+        n = next(ids)
+        return Update(
+            update_id=n,
+            inline_query=InlineQuery(
+                id=str(n),
+                from_user=_user(user_id),
+                query=query,
+                offset="",
             ),
         )
 

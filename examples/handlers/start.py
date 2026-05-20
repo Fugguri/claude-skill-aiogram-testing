@@ -1,8 +1,14 @@
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineQuery,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+    Message,
+)
 
 router = Router()
 
@@ -30,3 +36,26 @@ async def on_confirm(callback: CallbackQuery) -> None:
     if callback.message:
         await callback.message.edit_text("Confirmed")
     await callback.answer()
+
+
+@router.inline_query()
+async def on_inline(query: InlineQuery) -> None:
+    result = InlineQueryResultArticle(
+        id="1",
+        title=f"Result for {query.query}",
+        input_message_content=InputTextMessageContent(message_text=f"You searched: {query.query}"),
+    )
+    await query.answer(results=[result], cache_time=1)
+
+
+@router.message(Command("boom"))
+async def cmd_boom(message: Message) -> None:
+    raise RuntimeError("intentional crash for the error-handler test")
+
+
+@router.error()
+async def on_error(event) -> bool:
+    # aiogram passes ErrorEvent here; we acknowledge it and notify the user.
+    if event.update.message:
+        await event.update.message.answer(f"Caught: {type(event.exception).__name__}")
+    return True  # mark error as handled

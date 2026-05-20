@@ -57,10 +57,25 @@ PAIRS = [
      [EXAMPLES / "tests" / "conftest.py"]),
     ("explicit tests/ directory directive",
      "All test files",  # documented in 'Where tests live' section
-     # No example file to check — this is a doc-only directive.
-     # We still verify it survives in SKILL.md.
      []),
+    ("inline_query factory",
+     "def make_inline_query_update():",
+     [EXAMPLES / "tests" / "conftest.py"]),
+    # Items below intentionally live only in examples/ — they are reference
+    # implementations the docs prose discusses but does not literally include.
+    ("inline_query handler in example", "@router.inline_query()",
+     [EXAMPLES / "handlers" / "start.py"], "examples_only"),
+    ("error handler in example", "@router.error()",
+     [EXAMPLES / "handlers" / "start.py"], "examples_only"),
+    ("error handler assertion", '"Caught: RuntimeError" in sent.text',
+     [EXAMPLES / "tests" / "test_error_handler.py"], "examples_only"),
+    ("F.data magic filter (not lambda)", 'F.data == "confirm"',
+     [EXAMPLES / "handlers" / "start.py"], "examples_only"),
 ]
+
+
+def _scope(pair):
+    return pair[3] if len(pair) > 3 else "all"
 
 
 def main() -> int:
@@ -69,12 +84,16 @@ def main() -> int:
     errors: list[str] = []
 
     # Code snippets are identical English in both SKILL.md and SKILL.ru.md;
-    # only the prose differs. So every PAIR snippet must appear in both files.
-    for label, snippet, example_paths in PAIRS:
-        if snippet not in skill_md:
-            errors.append(f"[{label}] SKILL.md is missing the documented snippet:\n  {snippet!r}")
-        if snippet not in skill_ru:
-            errors.append(f"[{label}] SKILL.ru.md is missing the documented snippet:\n  {snippet!r}")
+    # only the prose differs. So every PAIR snippet must appear in both files —
+    # unless its scope is "examples_only".
+    for pair in PAIRS:
+        label, snippet, example_paths = pair[0], pair[1], pair[2]
+        scope = _scope(pair)
+        if scope != "examples_only":
+            if snippet not in skill_md:
+                errors.append(f"[{label}] SKILL.md is missing the documented snippet:\n  {snippet!r}")
+            if snippet not in skill_ru:
+                errors.append(f"[{label}] SKILL.ru.md is missing the documented snippet:\n  {snippet!r}")
         for path in example_paths:
             if not path.exists():
                 errors.append(f"[{label}] expected example file does not exist: {path}")
@@ -95,7 +114,12 @@ def main() -> int:
         )
         return 1
 
-    print(f"OK: {len(PAIRS)} doc/example triples in sync (EN + RU + examples).")
+    examples_only = sum(1 for p in PAIRS if _scope(p) == "examples_only")
+    full = len(PAIRS) - examples_only
+    print(
+        f"OK: {full} full triples (EN+RU+examples) + {examples_only} examples-only "
+        f"snippets in sync ({len(PAIRS)} total)."
+    )
     return 0
 
 

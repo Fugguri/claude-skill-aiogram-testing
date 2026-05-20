@@ -1,6 +1,6 @@
 ---
 name: testing-aiogram-bots
-description: Use when writing pytest tests for aiogram 3.x bot handlers without launching a live bot. All test files MUST be created under tests/ (never at project root). Covers MockedBot setup, dispatching Update objects (Message and CallbackQuery), asserting outgoing API calls, FSM state checks, middleware coverage, and includes guardrails against common AI hallucinations about aiogram testing (non-existent aiogram.test_utils, abandoned aiogram-tests package).
+description: Use when writing pytest tests for aiogram 3.x bot handlers. All test files MUST be created under tests/ (never at project root). Covers MockedBot, Message/CallbackQuery/InlineQuery dispatch, FSM, middleware, error handlers — and blocks common AI hallucinations (no such module as aiogram.test_utils; aiogram-tests on PyPI is abandoned).
 ---
 
 # Testing aiogram 3.x bots
@@ -200,6 +200,26 @@ def make_callback_update():
 
 
 @pytest.fixture
+def make_inline_query_update():
+    """Update-with-InlineQuery factory. `update = make_inline_query_update("search me")`."""
+    ids = count(1)
+
+    def _factory(query: str, *, user_id: int = 1) -> Update:
+        n = next(ids)
+        return Update(
+            update_id=n,
+            inline_query=InlineQuery(
+                id=str(n),
+                from_user=_user(user_id),
+                query=query,
+                offset="",
+            ),
+        )
+
+    return _factory
+
+
+@pytest.fixture
 def stub_message():
     """Готовый Message для add_result_for(SendMessage, ...)."""
     return Message(
@@ -209,6 +229,10 @@ def stub_message():
         text="ok",
     )
 ```
+
+> Добавь `InlineQuery` к импорту из `aiogram.types`.
+>
+> **Расширение фабрик.** Для типов апдейтов, которых здесь нет — `my_chat_member`, `poll`, `chat_join_request` и т.д. — повтори паттерн: бери имя поля из [модели `Update`](https://docs.aiogram.dev/en/latest/api/types/update.html), конструируй соответствующий тип с минимальными валидными полями, оборачивай в `Update(update_id=..., <field>=...)`, возвращай.
 
 **Тест:**
 ```python
@@ -246,6 +270,9 @@ async def test_start_replies_with_greeting(bot, dp, make_message_update, stub_me
 | Установить state до теста | `await ctx.set_state(MyStates.waiting)` |
 | Проверить data в FSM | `await ctx.get_data()` |
 | Прокачать callback_query | `await dp.feed_update(bot, make_callback_update("confirm"))` — см. фикстуру `make_callback_update` выше |
+| Прокачать inline_query | `await dp.feed_update(bot, make_inline_query_update("text"))` |
+| Сбросить очередь ответов между sub-сценариями в одном тесте | `bot.session.responses.clear()` (и `bot.session.requests.clear()` для другой стороны) |
+| Передать свой токен боту | `MockedBot(token="123:ABC")` — `kwargs.pop("token", ...)` принимает любой токен; дефолтный `"42:TEST"` используется только если не передан свой |
 
 ## Порядок очередей в MockedSession (важно)
 
@@ -307,6 +334,62 @@ async def test_confirm_button_edits_message(bot, dp, make_callback_update):
     all_calls = list(bot.session.requests)
     assert any(isinstance(c, EditMessageText) for c in all_calls)
     assert any(isinstance(c, AnswerCallbackQuery) for c in all_calls)
+```
+
+## Тест inline_query
+
+```python
+from aiogram.methods import AnswerInlineQuery
+
+
+async def test_inline_query_returns_one_result(bot, dp, make_inline_query_update):
+    bot.add_result_for(AnswerInlineQuery, ok=True, result=True)
+
+    await dp.feed_update(bot, make_inline_query_update("hello"))
+
+    sent = bot.get_request()
+    assert isinstance(sent, AnswerInlineQuery)
+    assert len(sent.results) == 1
+    assert "hello" in sent.results[0].title
+```
+
+## Тест error handler
+
+aiogram **глотает исключения хендлеров**, если зарегистрирован `@router.error()` — `dp.feed_update` не пробрасывает. Единственное наблюдаемое доказательство того что recovery сработал — API-вызов из error-хендлера. Ассертить нужно его, а не отсутствие исключения.
+
+```python
+# handlers/start.py
+@router.message(Command("boom"))
+async def cmd_boom(message: Message) -> None:
+    raise RuntimeError("intentional crash")
+
+
+@router.error()
+async def on_error(event) -> bool:
+    if event.update.message:
+        await event.update.message.answer(f"Caught: {type(event.exception).__name__}")
+    return True  # помечаем как обработанное
+
+
+# tests/test_error_handler.py
+from aiogram.methods import SendMessage
+
+
+async def test_error_handler_intercepts_crash(bot, dp, make_message_update, stub_message):
+    bot.add_result_for(SendMessage, ok=True, result=stub_message)
+
+    await dp.feed_update(bot, make_message_update("/boom"))
+
+    sent = bot.get_request()
+    assert isinstance(sent, SendMessage)
+    assert "Caught: RuntimeError" in sent.text
+```
+
+Если `@router.error()` НЕ зарегистрирован — исключение пробрасывается из `feed_update`, и тест падает с оригинальным traceback. Это тоже валидный (часто более ясный) target для assertion:
+```python
+import pytest
+with pytest.raises(RuntimeError, match="intentional crash"):
+    await dp.feed_update(bot, make_message_update("/boom"))
 ```
 
 ## Тест middleware
@@ -387,6 +470,9 @@ async def test_other_user_gets_guest_role(bot, dp_with_auth, make_message_update
 | Вызов хендлера напрямую (`await cmd_start(message)`) | Тест проходит, а на проде баг | Используй `dp.feed_update` — иначе обходишь filters/middleware/FSM |
 | Нет `tests/__init__.py` (только в `import_mode=prepend`) | `ModuleNotFoundError: tests.mocked_bot` | Либо создать пустой `__init__.py` + `pythonpath = ["."]`, либо использовать pytest 8+ дефолт `import_mode=importlib` (без `__init__.py`) |
 | `asyncio_mode` не настроен | `Async test functions are not natively supported` | `asyncio_mode = "auto"` в `pyproject.toml` или `@pytest.mark.asyncio` на каждый тест |
+| Тест думает что поймал баг, потому что исключение не вылетело — но `@router.error()` молча его съел | `dp.feed_update` глотает исключения хендлеров **только если зарегистрирован error handler**. Без него — пробрасывает | Ассерть на API-вызов recovery в error-хендлере (или временно отключи error handler через `dp.errors.handlers = []`). См. "Тест error handler". |
+| Album-сообщения (`media_group`) тестируются как один апдейт | Telegram доставляет каждое фото отдельным `Update` с общим `media_group_id`. aiogram не склеивает их в одно событие | Подавай каждое фото отдельным `Update` с тем же `media_group_id`. Если нужно как одно событие — буфери через middleware и тестируй буфер, а не сырой поток. |
+| Ответы из теста A текут в тест B (общий `MockedBot`) | pytest-фикстуры function-scoped по умолчанию, но если ты расширил scope до `module`/`session`, deque'и переживают тесты | Либо держи `bot` фикстуру function-scoped (по умолчанию), либо явно `bot.session.responses.clear()` + `bot.session.requests.clear()` в teardown |
 | Тесты написаны в корень проекта (`test_start.py` рядом с `main.py`) | `pytest` пишет `collected 0 items`; или import-ошибки потому что `from tests.mocked_bot import ...` не резолвится | Все тесты ОБЯЗАНЫ лежать в `tests/`. См. "Где живут тесты" в начале. Переноси файл в `tests/`, не наоборот. |
 | Второй тест падает с `RuntimeError: Router is already attached to <Dispatcher ...>` | `Router` импортируется как module-level singleton — после первого `include_router` у него выставлен `_parent_router` | **Предпочтительно:** строить свежий `Router()` внутри фикстуры и регистрировать хендлеры через factory (`def make_router(): ...` в модуле хендлеров). **Быстрый обход** (если рефакторинг сейчас не вариант): `router._parent_router = None` перед `include_router`. **Крайний случай:** `importlib.reload(handlers.start)` (тяжело, ломает identity-сравнения). |
 
